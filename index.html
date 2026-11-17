@@ -1,0 +1,2396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ular Tangga Matematika PID - SPLDV & Bangun Ruang</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top left, #1e1b4b, #0f172a 60%, #020617);
+            color: #f8fafc;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        /* Custom scrollbar for modals & logs */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* 10x10 Board Grid */
+        .board-10x10 {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 3D Dice Styling */
+        .scene-dice {
+            width: 84px;
+            height: 84px;
+            perspective: 400px;
+        }
+        .cube-dice {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+        }
+        .cube-face {
+            position: absolute;
+            width: 84px;
+            height: 84px;
+            border-radius: 16px;
+            background: linear-gradient(145deg, #ffffff, #e2e8f0);
+            border: 2px solid #cbd5e1;
+            box-shadow: inset 0 0 12px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.3);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            padding: 10px;
+            gap: 4px;
+        }
+        .dot {
+            background: #1e293b;
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 2px 3px rgba(0,0,0,0.5);
+        }
+        .dot.red { background: #e11d48; }
+        .face-1 { transform: rotateY(0deg) translateZ(42px); }
+        .face-2 { transform: rotateY(90deg) translateZ(42px); }
+        .face-3 { transform: rotateY(180deg) translateZ(42px); }
+        .face-4 { transform: rotateY(-90deg) translateZ(42px); }
+        .face-5 { transform: rotateX(90deg) translateZ(42px); }
+        .face-6 { transform: rotateX(-90deg) translateZ(42px); }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+            70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+        .active-turn-glow {
+            animation: pulse-ring 2s infinite;
+        }
+        .pawn-transition {
+            transition: left 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen w-screen overflow-hidden">
+
+    <!-- TOP HEADER BAR (Compact for 16:9 PID) -->
+    <header class="h-14 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-5 flex items-center justify-between shrink-0 z-20">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-gamepad text-white text-lg"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="text-base md:text-lg font-extrabold text-white tracking-tight">Ular Tangga Matematika PID</h1>
+                    <span class="px-2 py-0.5 text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-md">SPLDV & Bangun Ruang</span>
+                </div>
+                <p class="text-[11px] text-slate-400 hidden sm:block">Papan Interaktif Digital 100 Petak • Kompetisi 4 Kelompok</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button onclick="openQuestionManager()" class="flex items-center space-x-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Bank Soal (<span id="header-q-count">80</span>)</span>
+            </button>
+            <button onclick="openSettingsModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95">
+                <i class="fa-solid fa-sliders text-amber-400"></i>
+                <span>Pengaturan</span>
+            </button>
+            <button onclick="toggleAudio()" id="btn-audio" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95" title="Suara">
+                <i class="fa-solid fa-volume-high text-emerald-400" id="icon-audio"></i>
+                <span class="hidden md:inline" id="text-audio">Suara</span>
+            </button>
+            <button onclick="confirmResetGame()" class="flex items-center space-x-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95" title="Reset Permainan">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span class="hidden md:inline">Reset</span>
+            </button>
+            <button onclick="toggleFullScreen()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 p-2 rounded-xl text-xs transition active:scale-95" title="Layar Penuh PID">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN 16:9 WORKSPACE (70% Left Board, 30% Right Control Panel) -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden p-3 gap-3">
+
+        <!-- LEFT PANEL (70%): 10x10 SNAKE & LADDER BOARD -->
+        <section class="w-full lg:w-[70%] h-full bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-center relative shadow-2xl overflow-hidden">
+            <!-- Aspect-preserved square-ish or full-fit container -->
+            <div id="board-wrapper" class="relative w-full h-full max-w-[125vh] bg-slate-950 rounded-xl border-2 border-slate-700 shadow-inner overflow-hidden">
+                
+                <!-- 100 Grid Cells -->
+                <div id="board-grid" class="board-10x10 relative z-10"></div>
+
+                <!-- SVG Overlay for Realistic Snakes & 3D Ladders (viewBox 0 0 1000 1000) -->
+                <svg id="board-svg" viewBox="0 0 1000 1000" preserveAspectRatio="none" class="absolute inset-0 w-full h-full pointer-events-none z-20"></svg>
+
+                <!-- Floating Pawns Layer (Smoothly animated over cells) -->
+                <div id="pawns-layer" class="absolute inset-0 w-full h-full pointer-events-none z-30"></div>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL (30%): CONTROLS, GROUPS & LOGS -->
+        <aside class="w-full lg:w-[30%] h-full flex flex-col gap-2.5 overflow-hidden">
+            
+            <!-- 4 GROUPS SCOREBOARD -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shrink-0 shadow-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-users text-indigo-400"></i> Klasemen 4 Kelompok
+                    </span>
+                    <span class="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">Klik nama untuk edit</span>
+                </div>
+                <div id="groups-list" class="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <!-- DICE & TURN ACTION PANEL -->
+            <div class="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-3.5 shrink-0 shadow-lg flex flex-col items-center justify-between">
+                <div class="w-full flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span id="turn-badge-dot" class="w-3.5 h-3.5 rounded-full bg-rose-500 animate-ping"></span>
+                        <span class="text-xs font-bold text-slate-300">Giliran: <strong id="turn-group-name" class="text-white text-sm">Kelompok 1</strong></span>
+                    </div>
+                    <span id="active-mode-badge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Mode Klasik</span>
+                </div>
+
+                <div class="flex items-center justify-around w-full py-1 gap-3">
+                    <!-- 3D Cube Dice -->
+                    <div class="scene-dice cursor-pointer" onclick="handleRollDice()" title="Ketuk Dadu">
+                        <div id="cube-dice" class="cube-dice">
+                            <!-- Face 1 -->
+                            <div class="cube-face face-1">
+                                <div></div><div></div><div></div>
+                                <div></div><div class="dot red"></div><div></div>
+                                <div></div><div></div><div></div>
+                            </div>
+                            <!-- Face 2 -->
+                            <div class="cube-face face-2">
+                                <div class="dot"></div><div></div><div></div>
+                                <div></div><div></div><div></div>
+                                <div></div><div></div><div class="dot"></div>
+                            </div>
+                            <!-- Face 3 -->
+                            <div class="cube-face face-3">
+                                <div class="dot"></div><div></div><div></div>
+                                <div></div><div class="dot"></div><div></div>
+                                <div></div><div></div><div class="dot"></div>
+                            </div>
+                            <!-- Face 4 -->
+                            <div class="cube-face face-4">
+                                <div class="dot red"></div><div></div><div class="dot red"></div>
+                                <div></div><div></div><div></div>
+                                <div class="dot red"></div><div></div><div class="dot red"></div>
+                            </div>
+                            <!-- Face 5 -->
+                            <div class="cube-face face-5">
+                                <div class="dot"></div><div></div><div class="dot"></div>
+                                <div></div><div class="dot"></div><div></div>
+                                <div class="dot"></div><div></div><div class="dot"></div>
+                            </div>
+                            <!-- Face 6 -->
+                            <div class="cube-face face-6">
+                                <div class="dot"></div><div></div><div class="dot"></div>
+                                <div class="dot"></div><div></div><div class="dot"></div>
+                                <div class="dot"></div><div></div><div class="dot"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Big Touch-Friendly Roll Button -->
+                    <div class="flex-1 flex flex-col gap-1.5">
+                        <button id="btn-roll-dice" onclick="handleRollDice()" class="w-full py-4 px-4 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-600/30 active:scale-95 transition flex items-center justify-center gap-2 border border-indigo-400/30">
+                            <i class="fa-solid fa-dice text-xl"></i>
+                            <span>KOCOK DADU</span>
+                        </button>
+                        <div class="grid grid-cols-2 gap-1.5 text-[11px] text-slate-400 pt-0.5">
+                            <select id="quick-category-select" onchange="changeCategoryFilter(this.value)" class="bg-slate-800 text-emerald-300 font-bold rounded-lg px-2 py-1 border border-slate-700 focus:outline-none truncate" title="Filter Materi">
+                                <option value="ALL">Semua Materi</option>
+                                <option value="SPLDV">SPLDV</option>
+                                <option value="Bangun Ruang">Bangun Ruang</option>
+                            </select>
+                            <select id="quick-difficulty-select" onchange="changeDifficultyFilter(this.value)" class="bg-slate-800 text-indigo-300 font-bold rounded-lg px-2 py-1 border border-slate-700 focus:outline-none truncate" title="Filter Kesulitan">
+                                <option value="ALL">Semua Level</option>
+                                <option value="Mudah">Mudah</option>
+                                <option value="Sedang">Sedang</option>
+                                <option value="Sulit">Sulit</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LEGEND & LIVE ACTIVITY LOG -->
+            <div class="flex-1 bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col overflow-hidden shadow-lg">
+                <!-- Mini Legend -->
+                <div class="grid grid-cols-3 gap-1.5 pb-2 mb-2 border-b border-slate-800 text-[10px] font-bold text-center">
+                    <div class="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-lg py-1">🪜 Tangga (Naik)</div>
+                    <div class="bg-rose-500/15 text-rose-300 border border-rose-500/30 rounded-lg py-1">🐍 Ular (Turun)</div>
+                    <div class="bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-lg py-1">⭐ Petak Kuis</div>
+                </div>
+
+                <div class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                    <span>Riwayat Langkah</span>
+                    <span id="remaining-q-badge" class="text-[10px] font-bold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-500/30">Siap: 80/80</span>
+                </div>
+                <div id="activity-log" class="flex-1 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                    <!-- Logs injected here -->
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: INTERACTIVE QUIZ MODAL (LARGE PID-FRIENDLY)                  -->
+    <!-- ===================================================================== -->
+    <div id="quiz-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl max-w-3xl w-full p-6 md:p-8 shadow-2xl relative flex flex-col max-h-[92vh] overflow-y-auto">
+            
+            <!-- Modal Header -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800 mb-5">
+                <div class="flex items-center gap-2.5">
+                    <span id="quiz-context-badge" class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        ⭐ Tantangan Petak Bintang
+                    </span>
+                    <span id="quiz-diff-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        Sedang
+                    </span>
+                    <span id="quiz-cat-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        SPLDV
+                    </span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="quiz-team-label" class="text-sm font-extrabold text-white bg-slate-800 px-3.5 py-1.5 rounded-xl border border-slate-700">
+                        Kelompok 1
+                    </span>
+                    <div id="quiz-timer-box" class="text-sm font-extrabold text-amber-300 bg-amber-950/60 px-3.5 py-1.5 rounded-xl border border-amber-500/40 flex items-center gap-1.5">
+                        <i class="fa-solid fa-stopwatch"></i>
+                        <span id="quiz-timer-text">60s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Text -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-5 mb-5">
+                <p id="quiz-question-text" class="text-lg md:text-xl font-bold text-white leading-relaxed">
+                    Memuat pertanyaan...
+                </p>
+            </div>
+
+            <!-- Options Grid (2x2 on PID for easy reach) -->
+            <div id="quiz-options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-5">
+                <!-- Options injected here -->
+            </div>
+
+            <!-- Explanation / Solution Box (Shown after answering) -->
+            <div id="quiz-explanation-box" class="hidden rounded-2xl p-4 mb-5 border">
+                <div id="quiz-result-heading" class="text-base font-extrabold mb-1"></div>
+                <p id="quiz-explanation-text" class="text-sm text-slate-200 leading-relaxed"></p>
+            </div>
+
+            <!-- Action Footer -->
+            <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                <span id="quiz-rule-hint" class="text-xs text-slate-400 italic">Pilih jawaban yang paling tepat!</span>
+                <div class="flex gap-3">
+                    <button id="btn-submit-answer" onclick="confirmQuizAnswer()" disabled class="px-6 py-3 bg-indigo-600 disabled:opacity-40 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition text-sm">
+                        Kunci Jawaban
+                    </button>
+                    <button id="btn-continue-game" onclick="finishQuizTurn()" class="hidden px-7 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl shadow-lg transition text-sm flex items-center gap-2">
+                        <span>Lanjutkan Permainan</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: BANK SOAL & GENERATOR SOAL GURU                              -->
+    <!-- ===================================================================== -->
+    <div id="question-manager-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-5xl w-full h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <!-- Header -->
+            <div class="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-lg">
+                        <i class="fa-solid fa-database"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-extrabold text-white">Bank Soal & Pengembangan Soal (SPLDV & Bangun Ruang)</h2>
+                        <p class="text-xs text-slate-400">Tersimpan otomatis di browser. Tambah soal manual, gunakan Generator 1-Klik, atau Impor/Ekspor JSON.</p>
+                    </div>
+                </div>
+                <button onclick="closeQuestionManager()" class="w-9 h-9 rounded-xl bg-slate-700 hover:bg-slate-600 text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Action & Filter Bar -->
+            <div class="p-4 bg-slate-900 border-b border-slate-800 flex flex-col gap-3 shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <!-- Difficulty Filters -->
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button onclick="setManagerFilter('ALL')" id="mgr-filter-ALL" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white">Semua (<span id="mgr-count-all">80</span>)</button>
+                        <button onclick="setManagerFilter('Mudah')" id="mgr-filter-Mudah" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">Mudah (<span id="mgr-count-mudah">0</span>)</button>
+                        <button onclick="setManagerFilter('Sedang')" id="mgr-filter-Sedang" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">Sedang (<span id="mgr-count-sedang">0</span>)</button>
+                        <button onclick="setManagerFilter('Sulit')" id="mgr-filter-Sulit" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">Sulit (<span id="mgr-count-sulit">0</span>)</button>
+                    </div>
+
+                    <!-- Teacher Tools -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="openQuestionFormModal()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-plus"></i> Tambah Soal
+                        </button>
+                        <div class="relative inline-block">
+                            <button onclick="toggleGeneratorDropdown()" class="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generator <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                            </button>
+                            <div id="generator-dropdown" class="hidden absolute right-0 mt-1.5 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 overflow-hidden">
+                                <button onclick="generateAutoQuestion('Mudah')" class="w-full text-left px-4 py-2.5 text-xs font-bold text-emerald-300 hover:bg-slate-700 border-b border-slate-700/60">+ Generate Soal Mudah</button>
+                                <button onclick="generateAutoQuestion('Sedang')" class="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-300 hover:bg-slate-700 border-b border-slate-700/60">+ Generate Soal Sedang</button>
+                                <button onclick="generateAutoQuestion('Sulit')" class="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-300 hover:bg-slate-700">+ Generate Soal Sulit</button>
+                            </div>
+                        </div>
+                        <button onclick="exportQuestionsJSON()" class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition" title="Ekspor JSON">
+                            <i class="fa-solid fa-file-code text-indigo-400"></i> JSON
+                        </button>
+                        <button onclick="exportQuestionsCSV()" class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition" title="Ekspor CSV Excel">
+                            <i class="fa-solid fa-file-csv text-emerald-400"></i> CSV
+                        </button>
+                        <label class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer transition" title="Impor JSON atau CSV">
+                            <i class="fa-solid fa-upload text-amber-400"></i> Impor
+                            <input type="file" accept=".json,.csv" onchange="importQuestionsFile(event)" class="hidden">
+                        </label>
+                        <button onclick="restoreDefaultQuestions()" class="px-2.5 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition" title="Pulihkan 80 Soal Standar">
+                            Reset 80
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search & Topic Filter Row -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
+                    <div class="md:col-span-5 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="mgr-search-input" oninput="renderManagerQuestions()" placeholder="Cari kata kunci soal atau pembahasan..." class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div class="md:col-span-3">
+                        <select id="mgr-category-filter" onchange="renderManagerQuestions()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-semibold">
+                            <option value="ALL">Semua Materi (SPLDV & Bangun Ruang)</option>
+                            <option value="SPLDV">Materi: SPLDV</option>
+                            <option value="Bangun Ruang">Materi: Bangun Ruang</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-4">
+                        <select id="mgr-topic-filter" onchange="renderManagerQuestions()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-semibold">
+                            <option value="ALL">Semua 20 Kelompok Topik</option>
+                            <option value="1">Topik 1: Model Matematika Harga Barang (1-4)</option>
+                            <option value="2">Topik 2: Model Jumlah & Selisih (5-8)</option>
+                            <option value="3">Topik 3: Konsep Grafik & Unsur SPLDV (9-12)</option>
+                            <option value="4">Topik 4: Titik Potong Sumbu-X & Sumbu-Y (13-16)</option>
+                            <option value="5">Topik 5: Metode Substitusi Sederhana (17-20)</option>
+                            <option value="6">Topik 6: Nilai Bentuk Aljabar ax + by (21-24)</option>
+                            <option value="7">Topik 7: HP Sistem x+y=a & x-y=b (25-28)</option>
+                            <option value="8">Topik 8: Eliminasi Langsung Nilai x / y (29-32)</option>
+                            <option value="9">Topik 9: Soal Cerita Alat Tulis & Jajanan (33-36)</option>
+                            <option value="10">Topik 10: Soal Cerita Pakaian & Paket (37-40)</option>
+                            <option value="11">Topik 11: Sifat Bangun Ruang Sisi Datar (41-44)</option>
+                            <option value="12">Topik 12: Sifat Bangun Ruang Sisi Lengkung (45-48)</option>
+                            <option value="13">Topik 13: Luas Permukaan Kubus (49-52)</option>
+                            <option value="14">Topik 14: Luas Permukaan Balok (53-56)</option>
+                            <option value="15">Topik 15: Volume Balok (57-60)</option>
+                            <option value="16">Topik 16: Volume Limas Persegi (61-64)</option>
+                            <option value="17">Topik 17: Luas Permukaan Tabung (65-68)</option>
+                            <option value="18">Topik 18: Luas Permukaan Bola (69-72)</option>
+                            <option value="19">Topik 19: Volume Tabung (73-76)</option>
+                            <option value="20">Topik 20: Volume Kerucut / Tumpeng (77-80)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Cards List -->
+            <div id="mgr-questions-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: TAMBAH / EDIT SOAL FORM                                      -->
+    <!-- ===================================================================== -->
+    <div id="question-form-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 id="q-form-title" class="text-lg font-extrabold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-emerald-400"></i>
+                <span>Tambah Soal Baru</span>
+            </h3>
+            <form onsubmit="saveQuestionForm(event)" class="space-y-3.5">
+                <input type="hidden" id="edit-q-id" value="">
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Materi / Topik</label>
+                        <select id="form-q-category" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+                            <option value="SPLDV">SPLDV</option>
+                            <option value="Bangun Ruang">Bangun Ruang</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Tingkat Kesulitan</label>
+                        <select id="form-q-difficulty" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+                            <option value="Mudah">Mudah</option>
+                            <option value="Sedang">Sedang</option>
+                            <option value="Sulit">Sulit</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Grup Topik (1-20)</label>
+                        <input type="number" id="form-q-topic" min="1" max="20" value="1" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Pertanyaan</label>
+                    <textarea id="form-q-text" rows="3" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" placeholder="Tulis soal matematika di sini..."></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Filter Materi Soal</label>
+                    <select id="setting-category" onchange="updateSettings()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-semibold">
+                        <option value="ALL">Campuran (SPLDV & Bangun Ruang)</option>
+                        <option value="SPLDV">Hanya Materi SPLDV</option>
+                        <option value="Bangun Ruang">Hanya Materi Bangun Ruang</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Filter Tingkat Kesulitan Soal</label>
+                    <select id="setting-difficulty" onchange="updateSettings()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-semibold">
+                        <option value="ALL">Campuran (Mudah, Sedang, Sulit)</option>
+                        <option value="Mudah">Hanya Level Mudah</option>
+                        <option value="Sedang">Hanya Level Sedang</option>
+                        <option value="Sulit">Hanya Level Sulit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeSettingsModal()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs">Selesai</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 5: CUSTOM CONFIRM / TOAST MESSAGE BOX (NO alert/confirm)        -->
+    <!-- ===================================================================== -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <div class="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 text-xl">
+                <i class="fa-solid fa-circle-question"></i>
+            </div>
+            <h4 id="confirm-title" class="text-base font-extrabold text-white mb-1">Konfirmasi</h4>
+            <p id="confirm-message" class="text-xs text-slate-300 mb-5">Apakah Anda yakin?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
+                <button id="confirm-yes-btn" class="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 6: WINNER CELEBRATION MODAL                                     -->
+    <!-- ===================================================================== -->
+    <div id="winner-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-amber-500/50 rounded-3xl max-w-lg w-full p-8 text-center shadow-2xl">
+            <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/40 animate-bounce">
+                <i class="fa-solid fa-trophy text-slate-950 text-4xl"></i>
+            </div>
+            <h2 id="winner-title" class="text-3xl font-extrabold text-white mb-2">Kelompok 1 Juara!</h2>
+            <p id="winner-subtitle" class="text-sm text-slate-300 mb-6">Berhasil mencapai petak 100 dengan skor luar biasa!</p>
+            <div id="winner-standings" class="bg-slate-950/80 rounded-2xl p-4 mb-6 border border-slate-800 space-y-2 text-left text-xs"></div>
+            <button onclick="executeResetGame()" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold rounded-2xl shadow-lg text-sm">
+                Mainkan Babak Baru
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- JAVASCRIPT: AUDIO, DATA, BOARD ENGINE, SVG ART & QUIZ LOGIC           -->
+    <!-- ===================================================================== -->
+    <script>
+        // ---------------------------------------------------------------------
+        // 2. VERIFIED 80 REFERENCE & DEVELOPED QUESTIONS (20 TOPICS x 4 VARIATIONS)
+        // ---------------------------------------------------------------------
+        const TOPIC_LABELS = {
+            1: "Topik 1: Model Harga Barang",
+            2: "Topik 2: Model Jumlah & Selisih",
+            3: "Topik 3: Konsep Grafik SPLDV",
+            4: "Topik 4: Titik Potong Sumbu",
+            5: "Topik 5: Substitusi Sederhana",
+            6: "Topik 6: Nilai Aljabar ax + by",
+            7: "Topik 7: HP Sistem x+y & x-y",
+            8: "Topik 8: Eliminasi Langsung",
+            9: "Topik 9: Cerita Alat Tulis/Jajan",
+            10: "Topik 10: Cerita Pakaian/Paket",
+            11: "Topik 11: Sifat Sisi Datar",
+            12: "Topik 12: Sifat Sisi Lengkung",
+            13: "Topik 13: Luas Permukaan Kubus",
+            14: "Topik 14: Luas Permukaan Balok",
+            15: "Topik 15: Volume Balok",
+            16: "Topik 16: Volume Limas Persegi",
+            17: "Topik 17: Luas Permukaan Tabung",
+            18: "Topik 18: Luas Permukaan Bola",
+            19: "Topik 19: Volume Tabung",
+            20: "Topik 20: Volume Kerucut"
+        };
+
+        const DEFAULT_QUESTIONS = [
+            // ================= TOPIK 1 (Soal 1-4): Model Matematika Harga Barang =================
+            {
+                id: 1, topicGroup: 1, category: "SPLDV", difficulty: "Mudah",
+                question: "Harga 4 penghapus dan 5 penggaris adalah Rp18.000,00. Jika harga sebuah penghapus dinyatakan dengan x dan harga sebuah penggaris dinyatakan dengan y, model matematika yang tepat adalah ...",
+                options: ["5x + 4y = 18.000", "4x + 5y = 18.000", "4x - 5y = 18.000", "x + y = 18.000"],
+                answer: 1,
+                explanation: "4 penghapus (4x) ditambah 5 penggaris (5y) berharga Rp18.000,00 sehingga ditulis 4x + 5y = 18.000."
+            },
+            {
+                id: 2, topicGroup: 1, category: "SPLDV", difficulty: "Mudah",
+                question: "Budi membeli 3 buku tulis dan 2 pulpen dengan total harga Rp14.500,00. Jika harga satu buku tulis adalah x dan harga satu pulpen adalah y, model matematika yang sesuai adalah ...",
+                options: ["2x + 3y = 14.500", "3x + 2y = 14.500", "3x - 2y = 14.500", "5xy = 14.500"],
+                answer: 1,
+                explanation: "3 buku tulis = 3x dan 2 pulpen = 2y, jumlah harganya Rp14.500,00 sehingga modelnya 3x + 2y = 14.500."
+            },
+            {
+                id: 3, topicGroup: 1, category: "SPLDV", difficulty: "Mudah",
+                question: "Di sebuah toko buah, harga 2 kg jeruk dan 3 kg apel adalah Rp85.000,00. Jika x menyatakan harga 1 kg jeruk dan y menyatakan harga 1 kg apel, persamaannya adalah ...",
+                options: ["3x + 2y = 85.000", "2x + 3y = 85.000", "2x + y = 85.000", "x + y = 85.000"],
+                answer: 1,
+                explanation: "2 kg jeruk (2x) + 3 kg apel (3y) = 85.000."
+            },
+            {
+                id: 4, topicGroup: 1, category: "SPLDV", difficulty: "Mudah",
+                question: "Harga 2 tiket masuk dewasa dan 4 tiket anak-anak di kebun binatang adalah Rp110.000,00. Jika tiket dewasa dimisalkan p dan tiket anak dimisalkan q, model matematikanya adalah ...",
+                options: ["4p + 2q = 110.000", "2p + 4q = 110.000", "2p - 4q = 110.000", "p + q = 110.000"],
+                answer: 1,
+                explanation: "2 tiket dewasa (2p) dan 4 tiket anak (4q) berjumlah Rp110.000,00 → 2p + 4q = 110.000."
+            },
+
+            // ================= TOPIK 2 (Soal 5-8): Model Jumlah & Selisih Dua Bilangan =================
+            {
+                id: 5, topicGroup: 2, category: "SPLDV", difficulty: "Mudah",
+                question: "Jumlah dua bilangan cacah adalah 35 dan selisih kedua bilangan tersebut adalah 9. Model matematika dari pernyataan tersebut adalah ...",
+                options: ["x + y = 9 dan x - y = 35", "x - y = 35 dan x + y = 9", "x + y = 35 dan x - y = 9", "2x + y = 35 dan x - 2y = 9"],
+                answer: 2,
+                explanation: "Jumlah dua bilangan ditulis x + y = 35 dan selisihnya ditulis x - y = 9."
+            },
+            {
+                id: 6, topicGroup: 2, category: "SPLDV", difficulty: "Mudah",
+                question: "Jumlah umur Kakak (x) dan Adik (y) adalah 28 tahun, sedangkan selisih umur mereka adalah 6 tahun. Model matematika yang tepat adalah ...",
+                options: ["x + y = 28 dan x - y = 6", "x - y = 28 dan x + y = 6", "2x + y = 28 dan x - y = 6", "x + 2y = 28 dan x - y = 6"],
+                answer: 0,
+                explanation: "Jumlah umur (x + y = 28) dan selisih umur (x - y = 6)."
+            },
+            {
+                id: 7, topicGroup: 2, category: "SPLDV", difficulty: "Mudah",
+                question: "Seutas tali sepanjang 42 cm dipotong menjadi dua bagian dengan panjang x cm dan y cm. Jika selisih panjang kedua potongan tali adalah 8 cm, sistem persamaannya adalah ...",
+                options: ["x + y = 8 dan x - y = 42", "x + y = 42 dan x - y = 8", "x + y = 42 dan x + y = 8", "2x - y = 42 dan x + y = 8"],
+                answer: 1,
+                explanation: "Total panjang tali x + y = 42 dan selisih kedua potongan x - y = 8."
+            },
+            {
+                id: 8, topicGroup: 2, category: "SPLDV", difficulty: "Sedang",
+                question: "Keliling sebuah persegi panjang adalah 36 cm (p + l = 18). Jika selisih panjang (p) dan lebar (l) adalah 4 cm, model SPLDV yang paling sederhana adalah ...",
+                options: ["p + l = 36 dan p - l = 4", "p + l = 18 dan p - l = 4", "p - l = 18 dan p + l = 4", "2p + l = 18 dan p - l = 4"],
+                answer: 1,
+                explanation: "Keliling 2(p + l) = 36 → p + l = 18, dan selisihnya p - l = 4."
+            },
+
+            // ================= TOPIK 3 (Soal 9-12): Konsep Dasar Grafik & Unsur SPLDV =================
+            {
+                id: 9, topicGroup: 3, category: "SPLDV", difficulty: "Mudah",
+                question: "Titik perpotongan antara dua garis lurus yang menggambarkan solusi dari suatu Sistem Persamaan Linear Dua Variabel (SPLDV) disebut ...",
+                options: ["Titik pusat koordinat", "Himpunan penyelesaian", "Kemiringan garis", "Koefisien variabel"],
+                answer: 1,
+                explanation: "Dalam metode grafik SPLDV, titik potong kedua garis merupakan himpunan penyelesaian (HP)."
+            },
+            {
+                id: 10, topicGroup: 3, category: "SPLDV", difficulty: "Mudah",
+                question: "Jika grafik dua persamaan linear dalam SPLDV berupa dua garis yang saling sejajar dan tidak pernah berpotongan, maka SPLDV tersebut memiliki ...",
+                options: ["Tepat satu penyelesaian", "Dua penyelesaian", "Tidak memiliki penyelesaian", "Tak hingga banyaknya penyelesaian"],
+                answer: 2,
+                explanation: "Dua garis sejajar tidak memiliki titik potong sehingga himpunan penyelesaiannya kosong (tidak memiliki penyelesaian)."
+            },
+            {
+                id: 11, topicGroup: 3, category: "SPLDV", difficulty: "Sedang",
+                question: "Apabila dua garis lurus pada grafik SPLDV saling berimpit, maka banyaknya anggota himpunan penyelesaian dari SPLDV tersebut adalah ...",
+                options: ["Tidak ada penyelesaian", "Tepat satu penyelesaian", "Tepat dua penyelesaian", "Tak hingga banyaknya penyelesaian"],
+                answer: 3,
+                explanation: "Garis yang saling berimpit berpotongan di setiap titik sepanjang garis sehingga memiliki tak hingga penyelesaian."
+            },
+            {
+                id: 12, topicGroup: 3, category: "SPLDV", difficulty: "Mudah",
+                question: "Di bawah ini yang merupakan contoh Sistem Persamaan Linear Dua Variabel (SPLDV) adalah ...",
+                options: ["2x + 3 = 9 dan x - 1 = 4", "x² + y = 7 dan x - y = 1", "2x + y = 8 dan x - 3y = 1", "x + y + z = 6 dan x - y = 2"],
+                answer: 2,
+                explanation: "SPLDV terdiri dari dua persamaan linear yang masing-masing berpangkat satu dan memuat dua variabel (x dan y)."
+            },
+
+            // ================= TOPIK 4 (Soal 13-16): Titik Potong Sumbu-X dan Sumbu-Y =================
+            {
+                id: 13, topicGroup: 4, category: "SPLDV", difficulty: "Mudah",
+                question: "Garis lurus dengan persamaan 3x + 2y = 12 memotong sumbu-X di titik ...",
+                options: ["(0, 6)", "(6, 0)", "(0, 4)", "(4, 0)"],
+                answer: 3,
+                explanation: "Memotong sumbu-X berarti y = 0 → 3x + 2(0) = 12 → 3x = 12 → x = 4. Titik potongnya (4, 0)."
+            },
+            {
+                id: 14, topicGroup: 4, category: "SPLDV", difficulty: "Mudah",
+                question: "Garis lurus dengan persamaan 2x + 5y = 20 memotong sumbu-Y di titik ...",
+                options: ["(0, 4)", "(4, 0)", "(0, 10)", "(10, 0)"],
+                answer: 0,
+                explanation: "Memotong sumbu-Y berarti x = 0 → 2(0) + 5y = 20 → 5y = 20 → y = 4. Titik potongnya (0, 4)."
+            },
+            {
+                id: 15, topicGroup: 4, category: "SPLDV", difficulty: "Sedang",
+                question: "Titik potong garis 4x - 3y = 24 terhadap sumbu-X adalah ...",
+                options: ["(0, -8)", "(-8, 0)", "(0, 6)", "(6, 0)"],
+                answer: 3,
+                explanation: "Saat y = 0, diperoleh 4x = 24 → x = 6. Jadi garis memotong sumbu-X di (6, 0)."
+            },
+            {
+                id: 16, topicGroup: 4, category: "SPLDV", difficulty: "Sedang",
+                question: "Koordinat titik potong persamaan garis 5x + 3y = 15 dengan sumbu-Y adalah ...",
+                options: ["(3, 0)", "(0, 3)", "(5, 0)", "(0, 5)"],
+                answer: 3,
+                explanation: "Saat x = 0, diperoleh 3y = 15 → y = 5. Jadi titik potong pada sumbu-Y adalah (0, 5)."
+            },
+
+            // ================= TOPIK 5 (Soal 17-20): Metode Substitusi Sederhana =================
+            {
+                id: 17, topicGroup: 5, category: "SPLDV", difficulty: "Sedang",
+                question: "Diketahui x = 3y dan x + y = 16. Nilai dari y yang memenuhi persamaan tersebut adalah ...",
+                options: ["3", "4", "6", "12"],
+                answer: 1,
+                explanation: "Substitusi x = 3y ke x + y = 16 → 3y + y = 16 → 4y = 16 → y = 4."
+            },
+            {
+                id: 18, topicGroup: 5, category: "SPLDV", difficulty: "Sedang",
+                question: "Diketahui y = 2x dan x + y = 21. Nilai dari x yang memenuhi sistem persamaan tersebut adalah ...",
+                options: ["5", "7", "9", "14"],
+                answer: 1,
+                explanation: "Substitusi y = 2x ke x + y = 21 → x + 2x = 21 → 3x = 21 → x = 7."
+            },
+            {
+                id: 19, topicGroup: 5, category: "SPLDV", difficulty: "Sedang",
+                question: "Jika x = 4y dan x - y = 15, maka nilai y adalah ...",
+                options: ["3", "4", "5", "6"],
+                answer: 2,
+                explanation: "Substitusi x = 4y ke x - y = 15 → 4y - y = 15 → 3y = 15 → y = 5."
+            },
+            {
+                id: 20, topicGroup: 5, category: "SPLDV", difficulty: "Sedang",
+                question: "Diketahui y = 3x - 1 dan 2x + y = 14. Nilai x yang memenuhi adalah ...",
+                options: ["2", "3", "4", "5"],
+                answer: 1,
+                explanation: "2x + (3x - 1) = 14 → 5x - 1 = 14 → 5x = 15 → x = 3."
+            },
+
+            // ================= TOPIK 6 (Soal 21-24): Menentukan Nilai Bentuk Aljabar ax + by =================
+            {
+                id: 21, topicGroup: 6, category: "SPLDV", difficulty: "Sulit",
+                question: "Diketahui sistem persamaan linear dua variabel x + y = 9 dan 3x + y = 17. Nilai dari 3x - 2y adalah ...",
+                options: ["2", "4", "8", "10"],
+                answer: 0,
+                explanation: "Eliminasi y: 2x = 8 → x = 4, maka y = 5. Nilai 3x - 2y = 3(4) - 2(5) = 12 - 10 = 2."
+            },
+            {
+                id: 22, topicGroup: 6, category: "SPLDV", difficulty: "Sulit",
+                question: "Diketahui sistem persamaan x + y = 10 dan 2x + y = 16. Nilai dari 2x + 3y adalah ...",
+                options: ["20", "22", "24", "26"],
+                answer: 2,
+                explanation: "Eliminasi y: x = 6, maka y = 10 - 6 = 4. Nilai 2x + 3y = 2(6) + 3(4) = 12 + 12 = 24."
+            },
+            {
+                id: 23, topicGroup: 6, category: "SPLDV", difficulty: "Sulit",
+                question: "Jika x dan y memenuhi sistem persamaan 2x + y = 11 dan x + y = 7, maka nilai dari 4x - y adalah ...",
+                options: ["11", "13", "15", "19"],
+                answer: 1,
+                explanation: "Kurangkan kedua persamaan: x = 4, sehingga y = 7 - 4 = 3. Nilai 4x - y = 4(4) - 3 = 16 - 3 = 13."
+            },
+            {
+                id: 24, topicGroup: 6, category: "SPLDV", difficulty: "Sulit",
+                question: "Penyelesaian dari sistem persamaan x + 2y = 11 dan x + y = 7 adalah (x, y). Nilai dari 5x - 2y adalah ...",
+                options: ["7", "9", "11", "15"],
+                answer: 0,
+                explanation: "Kurangkan: y = 4, maka x = 7 - 4 = 3. Nilai 5x - 2y = 5(3) - 2(4) = 15 - 8 = 7."
+            },
+
+            // ================= TOPIK 7 (Soal 25-28): Himpunan Penyelesaian x + y = a & x - y = b =================
+            {
+                id: 25, topicGroup: 7, category: "SPLDV", difficulty: "Sedang",
+                question: "Himpunan penyelesaian dari sistem persamaan x + y = 8 dan x - y = 2 adalah ...",
+                options: ["{(3, 5)}", "{(5, 3)}", "{(6, 2)}", "{(2, 6)}"],
+                answer: 1,
+                explanation: "Jumlahkan persamaan: 2x = 10 → x = 5. Substitusi ke x + y = 8 → y = 3. Jadi HP = {(5, 3)}."
+            },
+            {
+                id: 26, topicGroup: 7, category: "SPLDV", difficulty: "Sedang",
+                question: "Himpunan penyelesaian dari sistem persamaan x + y = 12 dan x - y = 4 adalah ...",
+                options: ["{(4, 8)}", "{(8, 4)}", "{(7, 5)}", "{(9, 3)}"],
+                answer: 1,
+                explanation: "Jumlahkan persamaan: 2x = 16 → x = 8, maka y = 12 - 8 = 4. Jadi HP = {(8, 4)}."
+            },
+            {
+                id: 27, topicGroup: 7, category: "SPLDV", difficulty: "Sedang",
+                question: "Himpunan penyelesaian dari sistem persamaan x + y = 14 dan x - y = 6 adalah ...",
+                options: ["{(10, 4)}", "{(4, 10)}", "{(8, 6)}", "{(9, 5)}"],
+                answer: 0,
+                explanation: "2x = 20 → x = 10, dan y = 14 - 10 = 4. Jadi HP = {(10, 4)}."
+            },
+            {
+                id: 28, topicGroup: 7, category: "SPLDV", difficulty: "Sedang",
+                question: "Himpunan penyelesaian dari sistem persamaan x + y = 11 dan x - y = 5 adalah ...",
+                options: ["{(3, 8)}", "{(8, 3)}", "{(7, 4)}", "{(9, 2)}"],
+                answer: 1,
+                explanation: "2x = 16 → x = 8, sehingga y = 11 - 8 = 3. Jadi HP = {(8, 3)}."
+            },
+
+            // ================= TOPIK 8 (Soal 29-32): Metode Eliminasi Langsung =================
+            {
+                id: 29, topicGroup: 8, category: "SPLDV", difficulty: "Sedang",
+                question: "Dari sistem persamaan 3x + y = 13 dan x + y = 7, nilai dari x adalah ...",
+                options: ["2", "3", "4", "5"],
+                answer: 1,
+                explanation: "Eliminasi y: (3x + y) - (x + y) = 13 - 7 → 2x = 6 → x = 3."
+            },
+            {
+                id: 30, topicGroup: 8, category: "SPLDV", difficulty: "Sedang",
+                question: "Dari sistem persamaan 4x + y = 19 dan x + y = 7, nilai dari x adalah ...",
+                options: ["3", "4", "5", "6"],
+                answer: 1,
+                explanation: "Eliminasi y: (4x + y) - (x + y) = 19 - 7 → 3x = 12 → x = 4."
+            },
+            {
+                id: 31, topicGroup: 8, category: "SPLDV", difficulty: "Sedang",
+                question: "Diketahui sistem persamaan x + 3y = 17 dan x + y = 9. Nilai dari y adalah ...",
+                options: ["3", "4", "5", "6"],
+                answer: 1,
+                explanation: "Eliminasi x: (x + 3y) - (x + y) = 17 - 9 → 2y = 8 → y = 4."
+            },
+            {
+                id: 32, topicGroup: 8, category: "SPLDV", difficulty: "Sedang",
+                question: "Dari sistem persamaan 5x - y = 18 dan 2x - y = 6, nilai dari x adalah ...",
+                options: ["3", "4", "5", "6"],
+                answer: 1,
+                explanation: "Eliminasi y: (5x - y) - (2x - y) = 18 - 6 → 3x = 12 → x = 4."
+            },
+
+            // ================= TOPIK 9 (Soal 33-36): Soal Cerita Pembelian Alat Tulis / Jajanan =================
+            {
+                id: 33, topicGroup: 9, category: "SPLDV", difficulty: "Sulit",
+                question: "Rina membeli 3 buku tulis dan 1 pensil seharga Rp11.000,00. Di toko yang sama, Sinta membeli 1 buku tulis dan 1 pensil seharga Rp5.000,00. Harga 1 buah buku tulis adalah ...",
+                options: ["Rp2.000,00", "Rp2.500,00", "Rp3.000,00", "Rp3.500,00"],
+                answer: 2,
+                explanation: "3b + p = 11.000 dan b + p = 5.000 → 2b = 6.000 → b = Rp3.000,00."
+            },
+            {
+                id: 34, topicGroup: 9, category: "SPLDV", difficulty: "Sulit",
+                question: "Andi membeli 4 pulpen dan 1 penghapus seharga Rp14.000,00. Di toko yang sama, Doni membeli 2 pulpen dan 1 penghapus seharga Rp8.000,00. Harga 1 buah pulpen adalah ...",
+                options: ["Rp2.000,00", "Rp2.500,00", "Rp3.000,00", "Rp3.500,00"],
+                answer: 2,
+                explanation: "(4p + h) - (2p + h) = 14.000 - 8.000 → 2p = 6.000 → p = Rp3.000,00."
+            },
+            {
+                id: 35, topicGroup: 9, category: "SPLDV", difficulty: "Sulit",
+                question: "Di kantin sekolah, harga 3 mangkuk bakso dan 1 gelas es teh adalah Rp41.000,00. Sedangkan harga 1 mangkuk bakso dan 1 gelas es teh adalah Rp17.000,00. Harga 1 mangkuk bakso adalah ...",
+                options: ["Rp10.000,00", "Rp12.000,00", "Rp14.000,00", "Rp15.000,00"],
+                answer: 1,
+                explanation: "(3b + t) - (b + t) = 41.000 - 17.000 → 2b = 24.000 → b = Rp12.000,00."
+            },
+            {
+                id: 36, topicGroup: 9, category: "SPLDV", difficulty: "Sulit",
+                question: "Ibu membeli 5 kg beras dan 1 kg gula pasir seharga Rp77.000,00. Bibi membeli 2 kg beras dan 1 kg gula pasir di toko yang sama seharga Rp38.000,00. Harga 1 kg beras adalah ...",
+                options: ["Rp12.000,00", "Rp13.000,00", "Rp14.000,00", "Rp15.000,00"],
+                answer: 1,
+                explanation: "(5b + g) - (2b + g) = 77.000 - 38.000 → 3b = 39.000 → b = Rp13.000,00."
+            },
+
+            // ================= TOPIK 10 (Soal 37-40): Soal Cerita Pakaian / Paket Belanja =================
+            {
+                id: 37, topicGroup: 10, category: "SPLDV", difficulty: "Sulit",
+                question: "Harga 2 celana dan 3 kemeja adalah Rp410.000,00, sedangkan harga 3 celana dan 1 kemeja adalah Rp370.000,00. Harga 1 celana dan 1 kemeja adalah ...",
+                options: ["Rp160.000,00", "Rp170.000,00", "Rp180.000,00", "Rp190.000,00"],
+                answer: 1,
+                explanation: "Eliminasi kemeja: 9c + 3k = 1.110.000 dikurangi 2c + 3k = 410.000 → 7c = 700.000 → c = 100.000, k = 70.000. Total c + k = Rp170.000,00."
+            },
+            {
+                id: 38, topicGroup: 10, category: "SPLDV", difficulty: "Sulit",
+                question: "Harga 2 kaos dan 3 topi adalah Rp230.000,00, sedangkan harga 3 kaos dan 1 topi adalah Rp240.000,00. Harga 1 kaos dan 1 topi adalah ...",
+                options: ["Rp90.000,00", "Rp100.000,00", "Rp110.000,00", "Rp120.000,00"],
+                answer: 1,
+                explanation: "9k + 3t = 720.000 dikurangi 2k + 3t = 230.000 → 7k = 490.000 → k = 70.000, t = 30.000. Total k + t = Rp100.000,00."
+            },
+            {
+                id: 39, topicGroup: 10, category: "SPLDV", difficulty: "Sulit",
+                question: "Harga 2 tiket dewasa dan 3 tiket anak adalah Rp160.000,00, sedangkan harga 3 tiket dewasa dan 1 tiket anak adalah Rp170.000,00. Harga 1 tiket dewasa dan 1 tiket anak adalah ...",
+                options: ["Rp60.000,00", "Rp70.000,00", "Rp80.000,00", "Rp90.000,00"],
+                answer: 1,
+                explanation: "9d + 3a = 510.000 dikurangi 2d + 3a = 160.000 → 7d = 350.000 → d = 50.000, a = 20.000. Total d + a = Rp70.000,00."
+            },
+            {
+                id: 40, topicGroup: 10, category: "SPLDV", difficulty: "Sulit",
+                question: "Harga 2 kotak kue dan 3 botol sirup adalah Rp190.000,00, sedangkan harga 3 kotak kue dan 1 botol sirup adalah Rp180.000,00. Harga 1 kotak kue dan 1 botol sirup adalah ...",
+                options: ["Rp70.000,00", "Rp80.000,00", "Rp90.000,00", "Rp100.000,00"],
+                answer: 1,
+                explanation: "9k + 3s = 540.000 dikurangi 2k + 3s = 190.000 → 7k = 350.000 → k = 50.000, s = 30.000. Total k + s = Rp80.000,00."
+            },
+
+            // ================= TOPIK 11 (Soal 41-44): Sifat-Sifat Bangun Ruang Sisi Datar =================
+            {
+                id: 41, topicGroup: 11, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Bangun ruang sisi datar yang memiliki 6 sisi berbentuk persegi panjang dengan sisi-sisi yang berhadapan sama besar dan sejajar adalah ...",
+                options: ["Kubus", "Balok", "Prisma segilima", "Limas segiempat"],
+                answer: 1,
+                explanation: "Balok memiliki 6 sisi berbentuk persegi panjang dengan 3 pasang sisi berhadapan yang kongruen dan sejajar."
+            },
+            {
+                id: 42, topicGroup: 11, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Bangun ruang sisi datar yang dibatasi oleh 6 sisi berbentuk persegi yang seluruhnya kongruen (sama besar) dan memiliki 12 rusuk sama panjang adalah ...",
+                options: ["Balok", "Kubus", "Prisma segitiga", "Limas segitiga"],
+                answer: 1,
+                explanation: "Kubus memiliki 6 sisi persegi kongruen, 12 rusuk sama panjang, dan 8 titik sudut."
+            },
+            {
+                id: 43, topicGroup: 11, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Banyaknya titik sudut, rusuk, dan sisi pada bangun ruang prisma segitiga berturut-turut adalah ...",
+                options: ["6, 9, dan 5", "5, 8, dan 5", "6, 8, dan 5", "8, 12, dan 6"],
+                answer: 0,
+                explanation: "Prisma segitiga memiliki 2n = 6 titik sudut, 3n = 9 rusuk, dan n + 2 = 5 sisi."
+            },
+            {
+                id: 44, topicGroup: 11, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Bangun ruang sisi datar yang memiliki sebuah alas berbentuk segiempat dan 4 sisi tegak berbentuk segitiga yang bertemu di satu titik puncak adalah ...",
+                options: ["Prisma segiempat", "Limas segiempat", "Kubus", "Limas segitiga"],
+                answer: 1,
+                explanation: "Limas segiempat memiliki 1 alas segiempat, 4 sisi tegak segitiga, 8 rusuk, dan 5 titik sudut (termasuk titik puncak)."
+            },
+
+            // ================= TOPIK 12 (Soal 45-48): Sifat-Sifat Bangun Ruang Sisi Lengkung =================
+            {
+                id: 45, topicGroup: 12, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Bangun ruang sisi lengkung yang memiliki 2 rusuk lengkung, 3 sisi, dan tidak memiliki titik sudut adalah ...",
+                options: ["Kerucut", "Bola", "Tabung", "Prisma lingkaran"],
+                answer: 2,
+                explanation: "Tabung memiliki 3 sisi (alas, tutup, selimut), 2 rusuk lengkung, dan 0 titik sudut."
+            },
+            {
+                id: 46, topicGroup: 12, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Bangun ruang sisi lengkung yang memiliki alas berbentuk lingkaran, 1 rusuk lengkung, 2 sisi, dan 1 titik puncak adalah ...",
+                options: ["Tabung", "Bola", "Kerucut", "Limas lingkaran"],
+                answer: 2,
+                explanation: "Kerucut terdiri dari 2 sisi (alas lingkaran dan selimut kerucut), 1 rusuk lengkung, dan 1 titik puncak."
+            },
+            {
+                id: 47, topicGroup: 12, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Bangun ruang sisi lengkung yang hanya memiliki 1 buah sisi lengkung, tidak memiliki rusuk, dan tidak memiliki titik sudut adalah ...",
+                options: ["Tabung", "Kerucut", "Bola", "Setengah tabung"],
+                answer: 2,
+                explanation: "Bola hanya memiliki 1 sisi lengkung tertutup, 0 rusuk, dan 0 titik sudut."
+            },
+            {
+                id: 48, topicGroup: 12, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Jika selimut sebuah tabung dibuka dan direbahkan pada bidang datar, maka bangun datar yang terbentuk adalah ...",
+                options: ["Segitiga", "Lingkaran", "Persegi panjang", "Trapesium"],
+                answer: 2,
+                explanation: "Jaring-jaring selimut tabung berupa persegi panjang dengan panjang = keliling alas (2πr) dan lebar = tinggi tabung (t)."
+            },
+
+            // ================= TOPIK 13 (Soal 49-52): Luas Permukaan Kubus =================
+            {
+                id: 49, topicGroup: 13, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Luas permukaan sebuah kubus yang memiliki panjang rusuk 9 cm adalah ...",
+                options: ["81 cm²", "324 cm²", "486 cm²", "729 cm²"],
+                answer: 2,
+                explanation: "Luas permukaan kubus = 6 × s² = 6 × 9² = 6 × 81 = 486 cm²."
+            },
+            {
+                id: 50, topicGroup: 13, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Luas permukaan sebuah kubus yang memiliki panjang rusuk 6 cm adalah ...",
+                options: ["36 cm²", "144 cm²", "216 cm²", "256 cm²"],
+                answer: 2,
+                explanation: "LP kubus = 6 × s² = 6 × 6² = 6 × 36 = 216 cm²."
+            },
+            {
+                id: 51, topicGroup: 13, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Sebuah kotak kado berbentuk kubus memiliki panjang rusuk 8 cm. Luas kertas kado minimal yang dibutuhkan untuk membungkus seluruh permukaannya adalah ...",
+                options: ["64 cm²", "256 cm²", "384 cm²", "512 cm²"],
+                answer: 2,
+                explanation: "LP kubus = 6 × 8² = 6 × 64 = 384 cm²."
+            },
+            {
+                id: 52, topicGroup: 13, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Diketahui luas permukaan sebuah kubus adalah 600 cm². Panjang rusuk kubus tersebut adalah ...",
+                options: ["8 cm", "10 cm", "12 cm", "15 cm"],
+                answer: 1,
+                explanation: "6 × s² = 600 → s² = 100 → s = √100 = 10 cm."
+            },
+
+            // ================= TOPIK 14 (Soal 53-56): Luas Permukaan Balok =================
+            {
+                id: 53, topicGroup: 14, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Sebuah balok memiliki ukuran panjang 12 cm, lebar 5 cm, dan tinggi 4 cm. Luas permukaan balok tersebut adalah ...",
+                options: ["128 cm²", "240 cm²", "256 cm²", "480 cm²"],
+                answer: 2,
+                explanation: "LP = 2(pl + pt + lt) = 2(12×5 + 12×4 + 5×4) = 2(60 + 48 + 20) = 2(128) = 256 cm²."
+            },
+            {
+                id: 54, topicGroup: 14, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Sebuah balok berukuran panjang 10 cm, lebar 6 cm, dan tinggi 5 cm. Luas permukaan balok tersebut adalah ...",
+                options: ["140 cm²", "240 cm²", "280 cm²", "300 cm²"],
+                answer: 2,
+                explanation: "LP = 2(10×6 + 10×5 + 6×5) = 2(60 + 50 + 30) = 2(140) = 280 cm²."
+            },
+            {
+                id: 55, topicGroup: 14, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Luas permukaan sebuah balok yang memiliki panjang 8 cm, lebar 5 cm, dan tinggi 3 cm adalah ...",
+                options: ["79 cm²", "120 cm²", "158 cm²", "190 cm²"],
+                answer: 2,
+                explanation: "LP = 2(8×5 + 8×3 + 5×3) = 2(40 + 24 + 15) = 2(79) = 158 cm²."
+            },
+            {
+                id: 56, topicGroup: 14, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah balok memiliki panjang 15 cm, lebar 10 cm, dan tinggi 6 cm. Luas seluruh permukaan balok tersebut adalah ...",
+                options: ["300 cm²", "450 cm²", "600 cm²", "900 cm²"],
+                answer: 2,
+                explanation: "LP = 2(15×10 + 15×6 + 10×6) = 2(150 + 90 + 60) = 2(300) = 600 cm²."
+            },
+
+            // ================= TOPIK 15 (Soal 57-60): Volume Balok =================
+            {
+                id: 57, topicGroup: 15, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Volume sebuah balok yang berukuran 15 cm × 6 cm × 4 cm adalah ...",
+                options: ["180 cm³", "240 cm³", "360 cm³", "720 cm³"],
+                answer: 2,
+                explanation: "Volume balok = p × l × t = 15 × 6 × 4 = 360 cm³."
+            },
+            {
+                id: 58, topicGroup: 15, category: "Bangun Ruang", difficulty: "Mudah",
+                question: "Sebuah akuarium berbentuk balok memiliki panjang 20 cm, lebar 10 cm, dan tinggi 12 cm. Volume maksimal air yang dapat ditampung adalah ...",
+                options: ["1.200 cm³", "2.000 cm³", "2.400 cm³", "4.800 cm³"],
+                answer: 2,
+                explanation: "Volume = 20 × 10 × 12 = 2.400 cm³."
+            },
+            {
+                id: 59, topicGroup: 15, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Volume sebuah balok yang memiliki panjang 14 cm, lebar 8 cm, dan tinggi 5 cm adalah ...",
+                options: ["280 cm³", "420 cm³", "560 cm³", "640 cm³"],
+                answer: 2,
+                explanation: "Volume = 14 × 8 × 5 = 560 cm³."
+            },
+            {
+                id: 60, topicGroup: 15, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Diketahui volume sebuah balok adalah 480 cm³. Jika panjang balok 12 cm dan lebarnya 8 cm, maka tinggi balok tersebut adalah ...",
+                options: ["4 cm", "5 cm", "6 cm", "8 cm"],
+                answer: 1,
+                explanation: "t = V ÷ (p × l) = 480 ÷ (12 × 8) = 480 ÷ 96 = 5 cm."
+            },
+
+            // ================= TOPIK 16 (Soal 61-64): Volume Limas Persegi =================
+            {
+                id: 61, topicGroup: 16, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah limas tegak memiliki alas berbentuk persegi dengan panjang sisi 12 cm. Jika tinggi limas tersebut adalah 10 cm, volume limas tersebut adalah ...",
+                options: ["1.440 cm³", "720 cm³", "480 cm³", "360 cm³"],
+                answer: 2,
+                explanation: "Volume limas = 1/3 × Luas Alas × t = 1/3 × (12 × 12) × 10 = 48 × 10 = 480 cm³."
+            },
+            {
+                id: 62, topicGroup: 16, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah limas persegi memiliki panjang sisi alas 9 cm dan tinggi limas 12 cm. Volume limas tersebut adalah ...",
+                options: ["108 cm³", "324 cm³", "648 cm³", "972 cm³"],
+                answer: 1,
+                explanation: "Volume limas = 1/3 × (9 × 9) × 12 = 81 × 4 = 324 cm³."
+            },
+            {
+                id: 63, topicGroup: 16, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Alas sebuah limas berbentuk persegi dengan panjang sisi 6 cm. Jika tinggi limas adalah 15 cm, maka volume limas tersebut adalah ...",
+                options: ["90 cm³", "180 cm³", "270 cm³", "540 cm³"],
+                answer: 1,
+                explanation: "Volume limas = 1/3 × (6 × 6) × 15 = 36 × 5 = 180 cm³."
+            },
+            {
+                id: 64, topicGroup: 16, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah hiasan berbentuk limas alas persegi memiliki sisi alas 10 cm dan tinggi 18 cm. Volume hiasan tersebut adalah ...",
+                options: ["300 cm³", "600 cm³", "900 cm³", "1.800 cm³"],
+                answer: 1,
+                explanation: "Volume limas = 1/3 × (10 × 10) × 18 = 100 × 6 = 600 cm³."
+            },
+
+            // ================= TOPIK 17 (Soal 65-68): Luas Permukaan Tabung =================
+            {
+                id: 65, topicGroup: 17, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Luas permukaan tabung yang memiliki panjang jari-jari alas 7 cm dan tinggi 13 cm (π = 22/7) adalah ...",
+                options: ["440 cm²", "572 cm²", "880 cm²", "1.001 cm²"],
+                answer: 2,
+                explanation: "LP tabung = 2 × π × r × (r + t) = 2 × (22/7) × 7 × (7 + 13) = 44 × 20 = 880 cm²."
+            },
+            {
+                id: 66, topicGroup: 17, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah kaleng berbentuk tabung memiliki jari-jari alas 7 cm dan tinggi 10 cm (π = 22/7). Luas permukaan kaleng tersebut adalah ...",
+                options: ["440 cm²", "594 cm²", "748 cm²", "1.540 cm²"],
+                answer: 2,
+                explanation: "LP = 2 × (22/7) × 7 × (7 + 10) = 44 × 17 = 748 cm²."
+            },
+            {
+                id: 67, topicGroup: 17, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Luas permukaan sebuah tabung tertutup yang memiliki jari-jari alas 14 cm dan tinggi 6 cm (π = 22/7) adalah ...",
+                options: ["880 cm²", "1.232 cm²", "1.760 cm²", "3.696 cm²"],
+                answer: 2,
+                explanation: "LP = 2 × (22/7) × 14 × (14 + 6) = 88 × 20 = 1.760 cm²."
+            },
+            {
+                id: 68, topicGroup: 17, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Diketahui sebuah tabung memiliki panjang jari-jari 7 cm dan tinggi 8 cm (π = 22/7). Luas permukaan tabung tersebut adalah ...",
+                options: ["352 cm²", "506 cm²", "660 cm²", "1.232 cm²"],
+                answer: 2,
+                explanation: "LP = 2 × (22/7) × 7 × (7 + 8) = 44 × 15 = 660 cm²."
+            },
+
+            // ================= TOPIK 18 (Soal 69-72): Luas Permukaan Bola =================
+            {
+                id: 69, topicGroup: 18, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Luas permukaan sebuah bola dengan panjang jari-jari 5 cm (π = 3,14) adalah ...",
+                options: ["78,5 cm²", "157 cm²", "314 cm²", "628 cm²"],
+                answer: 2,
+                explanation: "LP bola = 4 × π × r² = 4 × 3,14 × 5² = 4 × 3,14 × 25 = 314 cm²."
+            },
+            {
+                id: 70, topicGroup: 18, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Luas permukaan sebuah bola yang memiliki jari-jari 10 cm (π = 3,14) adalah ...",
+                options: ["314 cm²", "628 cm²", "1.256 cm²", "3.140 cm²"],
+                answer: 2,
+                explanation: "LP bola = 4 × 3,14 × 10² = 4 × 314 = 1.256 cm²."
+            },
+            {
+                id: 71, topicGroup: 18, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Sebuah bola basket memiliki jari-jari 7 cm (π = 22/7). Luas permukaan bola tersebut adalah ...",
+                options: ["154 cm²", "308 cm²", "616 cm²", "1.232 cm²"],
+                answer: 2,
+                explanation: "LP bola = 4 × (22/7) × 7² = 4 × 154 = 616 cm²."
+            },
+            {
+                id: 72, topicGroup: 18, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Luas permukaan sebuah bola dengan panjang jari-jari 14 cm (π = 22/7) adalah ...",
+                options: ["616 cm²", "1.232 cm²", "1.848 cm²", "2.464 cm²"],
+                answer: 3,
+                explanation: "LP bola = 4 × (22/7) × 14 × 14 = 4 × 616 = 2.464 cm²."
+            },
+
+            // ================= TOPIK 19 (Soal 73-76): Volume Tabung =================
+            {
+                id: 73, topicGroup: 19, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Volume sebuah tabung dengan panjang jari-jari 14 cm dan tinggi 10 cm (π = 22/7) adalah ...",
+                options: ["1.540 cm³", "3.080 cm³", "4.620 cm³", "6.160 cm³"],
+                answer: 3,
+                explanation: "Volume tabung = π × r² × t = (22/7) × 14 × 14 × 10 = 616 × 10 = 6.160 cm³."
+            },
+            {
+                id: 74, topicGroup: 19, category: "Bangun Ruang", difficulty: "Sedang",
+                question: "Volume sebuah tabung yang memiliki panjang jari-jari 7 cm dan tinggi 10 cm (π = 22/7) adalah ...",
+                options: ["440 cm³", "770 cm³", "1.540 cm³", "3.080 cm³"],
+                answer: 2,
+                explanation: "Volume tabung = (22/7) × 7 × 7 × 10 = 154 × 10 = 1.540 cm³."
+            },
+            {
+                id: 75, topicGroup: 19, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah drum berbentuk tabung memiliki jari-jari alas 7 cm dan tinggi 20 cm (π = 22/7). Volume drum tersebut adalah ...",
+                options: ["1.540 cm³", "2.200 cm³", "3.080 cm³", "4.400 cm³"],
+                answer: 2,
+                explanation: "Volume tabung = (22/7) × 7² × 20 = 154 × 20 = 3.080 cm³."
+            },
+            {
+                id: 76, topicGroup: 19, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Volume sebuah tabung dengan jari-jari 10 cm dan tinggi 12 cm (π = 3,14) adalah ...",
+                options: ["376,8 cm³", "1.256 cm³", "3.768 cm³", "7.536 cm³"],
+                answer: 2,
+                explanation: "Volume tabung = 3,14 × 10² × 12 = 314 × 12 = 3.768 cm³."
+            },
+
+            // ================= TOPIK 20 (Soal 77-80): Volume Kerucut / Cetakan Tumpeng =================
+            {
+                id: 77, topicGroup: 20, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah cetakan tumpeng berbentuk kerucut terisi penuh oleh nasi. Jika diameter alas cetakan 14 cm dan tingginya 21 cm (π = 22/7), volume nasi di dalam cetakan tersebut adalah ...",
+                options: ["1.078 cm³", "2.156 cm³", "3.234 cm³", "4.312 cm³"],
+                answer: 0,
+                explanation: "Diameter = 14 cm → r = 7 cm. Volume kerucut = 1/3 × (22/7) × 7 × 7 × 21 = 154 × 7 = 1.078 cm³."
+            },
+            {
+                id: 78, topicGroup: 20, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah topi ulang tahun berbentuk kerucut memiliki jari-jari alas 7 cm dan tinggi 15 cm (π = 22/7). Volume ruang di dalam topi tersebut adalah ...",
+                options: ["385 cm³", "770 cm³", "1.155 cm³", "2.310 cm³"],
+                answer: 1,
+                explanation: "Volume kerucut = 1/3 × (22/7) × 7 × 7 × 15 = 154 × 5 = 770 cm³."
+            },
+            {
+                id: 79, topicGroup: 20, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Sebuah kerucut memiliki diameter alas 14 cm dan tinggi 12 cm (π = 22/7). Volume kerucut tersebut adalah ...",
+                options: ["308 cm³", "616 cm³", "1.232 cm³", "1.848 cm³"],
+                answer: 1,
+                explanation: "Diameter = 14 cm → r = 7 cm. Volume kerucut = 1/3 × (22/7) × 7² × 12 = 154 × 4 = 616 cm³."
+            },
+            {
+                id: 80, topicGroup: 20, category: "Bangun Ruang", difficulty: "Sulit",
+                question: "Volume sebuah kerucut yang memiliki panjang jari-jari alas 10 cm dan tinggi 9 cm (π = 3,14) adalah ...",
+                options: ["314 cm³", "628 cm³", "942 cm³", "2.826 cm³"],
+                answer: 2,
+                explanation: "Volume kerucut = 1/3 × 3,14 × 10² × 9 = 314 × 3 = 942 cm³."
+            }
+        ];
+
+        const STORAGE_KEY = 'pid_ular_tangga_questions_80_v1';
+        let questionsBank = [];
+        let usedQuestionIds = new Set();
+
+        function loadQuestionsFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        questionsBank = parsed;
+                        return;
+                    }
+                }
+            } catch (e) {}
+            questionsBank = JSON.parse(JSON.stringify(DEFAULT_QUESTIONS));
+            saveQuestionsToStorage();
+        }
+
+        function saveQuestionsToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(questionsBank));
+            } catch (e) {}
+            updateQuestionCounters();
+        }
+
+        function updateQuestionCounters() {
+            document.getElementById('header-q-count').innerText = questionsBank.length;
+            const pool = getFilteredQuestions();
+            const available = pool.filter(q => !usedQuestionIds.has(q.id));
+            document.getElementById('remaining-q-badge').innerText = `Siap: ${available.length}/${pool.length}`;
+        }
+
+        // ---------------------------------------------------------------------
+        // 3. BOARD 10x10 CONFIGURATION (SNAKES, LADDERS, STAR QUIZ TILES)
+        // ---------------------------------------------------------------------
+        const LADDERS = [
+            { start: 4, end: 25 },
+            { start: 13, end: 46 },
+            { start: 22, end: 58 },
+            { start: 33, end: 69 },
+            { start: 42, end: 79 },
+            { start: 54, end: 88 },
+            { start: 62, end: 96 }
+        ];
+
+        const SNAKES = [
+            { start: 27, end: 6 },
+            { start: 40, end: 18 },
+            { start: 51, end: 29 },
+            { start: 66, end: 36 },
+            { start: 76, end: 45 },
+            { start: 89, end: 53 },
+            { start: 98, end: 64 }
+        ];
+
+        const STAR_TILES = [7, 11, 16, 20, 31, 38, 44, 49, 57, 61, 71, 74, 82, 85, 92, 95];
+
+        // 4 Teams State
+        let teams = [
+            { id: 0, name: "Kelompok 1", colorName: "Merah", bg: "#e11d48", lightBg: "rgba(225, 29, 72, 0.15)", border: "#fb7185", pos: 1, score: 0 },
+            { id: 1, name: "Kelompok 2", colorName: "Biru", bg: "#2563eb", lightBg: "rgba(37, 99, 235, 0.15)", border: "#60a5fa", pos: 1, score: 0 },
+            { id: 2, name: "Kelompok 3", colorName: "Hijau", bg: "#059669", lightBg: "rgba(5, 150, 105, 0.15)", border: "#34d399", pos: 1, score: 0 },
+            { id: 3, name: "Kelompok 4", colorName: "Kuning", bg: "#d97706", lightBg: "rgba(217, 119, 6, 0.15)", border: "#fbbf24", pos: 1, score: 0 }
+        ];
+
+        let currentTurn = 0;
+        let isBusy = false;
+        let gameWon = false;
+
+        // Game Settings
+        let settings = {
+            quizMode: 'classic',      // 'classic' | 'everystep'
+            timerDuration: 60,        // seconds (0 = unlimited)
+            difficultyFilter: 'ALL',  // 'ALL' | 'Mudah' | 'Sedang' | 'Sulit'
+            categoryFilter: 'ALL'     // 'ALL' | 'SPLDV' | 'Bangun Ruang'
+        };
+
+        // ---------------------------------------------------------------------
+        // 4. COORDINATE MAPPING (CELL 1..100 -> SVG 0..1000 & % POSITION)
+        // ---------------------------------------------------------------------
+        function getCellCoordinates(cellNum) {
+            const clamped = Math.max(1, Math.min(100, cellNum));
+            const zeroIdx = clamped - 1;
+            const rowFromBottom = Math.floor(zeroIdx / 10); // 0 (bottom) to 9 (top)
+            const colInRow = zeroIdx % 10;
+
+            // Boustrophedon zig-zag: even rows from bottom go Left->Right, odd rows go Right->Left
+            const col = (rowFromBottom % 2 === 0) ? colInRow : (9 - colInRow);
+            const rowFromTop = 9 - rowFromBottom;
+
+            return {
+                col,
+                row: rowFromTop,
+                svgX: col * 100 + 50,
+                svgY: rowFromTop * 100 + 50,
+                pctX: col * 10 + 5,
+                pctY: rowFromTop * 10 + 5
+            };
+        }
+
+        function renderBoardGrid() {
+            const grid = document.getElementById('board-grid');
+            grid.innerHTML = '';
+
+            // Build top-to-bottom (row 9 down to 0)
+            for (let r = 9; r >= 0; r--) {
+                for (let c = 0; c < 10; c++) {
+                    const cellNum = (r % 2 === 0) ? (r * 10 + c + 1) : (r * 10 + (9 - c) + 1);
+                    const isEven = (r + c) % 2 === 0;
+
+                    const ladderObj = LADDERS.find(l => l.start === cellNum);
+                    const snakeObj = SNAKES.find(s => s.start === cellNum);
+                    const isStar = STAR_TILES.includes(cellNum);
+
+                    let cellBg = isEven ? 'bg-slate-800/80' : 'bg-slate-900/90';
+                    let badgeHtml = '';
+
+                    if (cellNum === 1) {
+                        cellBg = 'bg-indigo-900/80 border-indigo-400';
+                        badgeHtml = `<span class="text-[9px] font-extrabold text-indigo-200 bg-indigo-600 px-1 rounded">START</span>`;
+                    } else if (cellNum === 100) {
+                        cellBg = 'bg-amber-900/80 border-amber-400';
+                        badgeHtml = `<span class="text-[9px] font-extrabold text-slate-950 bg-amber-400 px-1 rounded">👑 100</span>`;
+                    } else if (ladderObj) {
+                        cellBg = 'bg-emerald-950/60';
+                        badgeHtml = `<span class="text-[9px] font-bold text-emerald-300 bg-emerald-500/20 px-1 rounded">🪜→${ladderObj.end}</span>`;
+                    } else if (snakeObj) {
+                        cellBg = 'bg-rose-950/60';
+                        badgeHtml = `<span class="text-[9px] font-bold text-rose-300 bg-rose-500/20 px-1 rounded">🐍→${snakeObj.end}</span>`;
+                    } else if (isStar) {
+                        cellBg = 'bg-amber-950/40';
+                        badgeHtml = `<span class="text-[10px] text-amber-400">⭐</span>`;
+                    }
+
+                    const cell = document.createElement('div');
+                    cell.className = `border border-slate-700/50 ${cellBg} p-1 flex flex-col justify-between relative overflow-hidden`;
+                    cell.innerHTML = `
+                        <div class="flex items-center justify-between leading-none z-10">
+                            <span class="text-[10px] md:text-xs font-extrabold ${cellNum === 100 ? 'text-amber-300' : 'text-slate-400'}">${cellNum}</span>
+                            ${badgeHtml}
+                        </div>
+                    `;
+                    grid.appendChild(cell);
+                }
+            }
+
+            drawSnakesAndLaddersSVG();
+            renderPawns(false);
+        }
+
+        // ---------------------------------------------------------------------
+        // 5. PRECISION SVG VECTOR ART FOR LADDERS & CURVED SNAKES
+        // ---------------------------------------------------------------------
+        function drawSnakesAndLaddersSVG() {
+            const svg = document.getElementById('board-svg');
+            let svgContent = `
+                <defs>
+                    <filter id="drop-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.55"/>
+                    </filter>
+                    <linearGradient id="ladder-gold" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#f59e0b"/>
+                        <stop offset="50%" stop-color="#fde047"/>
+                        <stop offset="100%" stop-color="#d97706"/>
+                    </linearGradient>
+                </defs>
+            `;
+
+            // Draw Ladders
+            LADDERS.forEach(ladder => {
+                const p1 = getCellCoordinates(ladder.start);
+                const p2 = getCellCoordinates(ladder.end);
+                const dx = p2.svgX - p1.svgX;
+                const dy = p2.svgY - p1.svgY;
+                const len = Math.hypot(dx, dy);
+                const nx = (-dy / len) * 14;
+                const ny = (dx / len) * 14;
+
+                // Rails
+                svgContent += `
+                    <g filter="url(#drop-shadow)" opacity="0.92">
+                        <line x1="${p1.svgX + nx}" y1="${p1.svgY + ny}" x2="${p2.svgX + nx}" y2="${p2.svgY + ny}" stroke="url(#ladder-gold)" stroke-width="7" stroke-linecap="round"/>
+                        <line x1="${p1.svgX - nx}" y1="${p1.svgY - ny}" x2="${p2.svgX - nx}" y2="${p2.svgY - ny}" stroke="url(#ladder-gold)" stroke-width="7" stroke-linecap="round"/>
+                `;
+
+                // Rungs
+                const steps = Math.max(3, Math.floor(len / 38));
+                for (let i = 1; i < steps; i++) {
+                    const t = i / steps;
+                    const rx = p1.svgX + dx * t;
+                    const ry = p1.svgY + dy * t;
+                    svgContent += `<line x1="${rx + nx}" y1="${ry + ny}" x2="${rx - nx}" y2="${ry - ny}" stroke="#fef08a" stroke-width="5" stroke-linecap="round"/>`;
+                }
+                svgContent += `</g>`;
+            });
+
+            // Draw Curved Snakes
+            const snakeColors = ['#f43f5e', '#ec4899', '#a855f7', '#ef4444', '#f97316', '#e11d48', '#db2777'];
+            SNAKES.forEach((snake, idx) => {
+                const head = getCellCoordinates(snake.start);
+                const tail = getCellCoordinates(snake.end);
+                const color = snakeColors[idx % snakeColors.length];
+
+                const midX = (head.svgX + tail.svgX) / 2;
+                const midY = (head.svgY + tail.svgY) / 2;
+                const dx = tail.svgX - head.svgX;
+                const dy = tail.svgY - head.svgY;
+                const perpX = -dy * 0.25;
+                const perpY = dx * 0.25;
+
+                const c1x = (head.svgX + midX) / 2 + perpX;
+                const c1y = (head.svgY + midY) / 2 + perpY;
+                const c2x = (midX + tail.svgX) / 2 - perpX;
+                const c2y = (midY + tail.svgY) / 2 - perpY;
+
+                const pathD = `M ${head.svgX} ${head.svgY} Q ${c1x} ${c1y}, ${midX} ${midY} Q ${c2x} ${c2y}, ${tail.svgX} ${tail.svgY}`;
+
+                svgContent += `
+                    <g filter="url(#drop-shadow)" opacity="0.92">
+                        <path d="${pathD}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"/>
+                        <path d="${pathD}" fill="none" stroke="#fecdd3" stroke-width="4" stroke-dasharray="10,14" stroke-linecap="round"/>
+                        <!-- Snake Head -->
+                        <circle cx="${head.svgX}" cy="${head.svgY}" r="14" fill="${color}" stroke="#ffffff" stroke-width="2.5"/>
+                        <circle cx="${head.svgX - 4}" cy="${head.svgY - 3}" r="2.5" fill="#ffffff"/>
+                        <circle cx="${head.svgX + 4}" cy="${head.svgY - 3}" r="2.5" fill="#ffffff"/>
+                        <circle cx="${head.svgX - 4}" cy="${head.svgY - 3}" r="1.2" fill="#0f172a"/>
+                        <circle cx="${head.svgX + 4}" cy="${head.svgY - 3}" r="1.2" fill="#0f172a"/>
+                    </g>
+                `;
+            });
+
+            svg.innerHTML = svgContent;
+        }
+
+        // ---------------------------------------------------------------------
+        // 6. PAWNS RENDERING (2x2 COLLISION OFFSET WHEN SHARING SAME CELL)
+        // ---------------------------------------------------------------------
+        function renderPawns(animate = true) {
+            const layer = document.getElementById('pawns-layer');
+
+            // Group teams by current cell position to prevent overlapping
+            const cellGroups = {};
+            teams.forEach(t => {
+                if (!cellGroups[t.pos]) cellGroups[t.pos] = [];
+                cellGroups[t.pos].push(t);
+            });
+
+            const offsets = [
+                { dx: -1.8, dy: -1.8 },
+                { dx: 1.8, dy: -1.8 },
+                { dx: -1.8, dy: 1.8 },
+                { dx: 1.8, dy: 1.8 }
+            ];
+
+            teams.forEach(t => {
+                let pawnEl = document.getElementById(`pawn-team-${t.id}`);
+                if (!pawnEl) {
+                    pawnEl = document.createElement('div');
+                    pawnEl.id = `pawn-team-${t.id}`;
+                    pawnEl.className = "absolute w-6 h-6 md:w-7 md:h-7 -ml-3 -mt-3 md:-ml-3.5 md:-mt-3.5 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-[11px] font-extrabold text-white pawn-transition";
+                    layer.appendChild(pawnEl);
+                }
+
+                const coords = getCellCoordinates(t.pos);
+                const occupants = cellGroups[t.pos];
+                const idxInCell = occupants.indexOf(t);
+                const off = occupants.length > 1 ? offsets[idxInCell] : { dx: 0, dy: 0 };
+
+                pawnEl.style.backgroundColor = t.bg;
+                pawnEl.style.left = `${coords.pctX + off.dx}%`;
+                pawnEl.style.top = `${coords.pctY + off.dy}%`;
+                pawnEl.style.zIndex = (t.id === currentTurn) ? 40 : 30;
+                pawnEl.innerText = t.id + 1;
+            });
+        }
+
+        // ---------------------------------------------------------------------
+        // 7. RIGHT PANEL UI (GROUPS SCOREBOARD & LOGS)
+        // ---------------------------------------------------------------------
+        function renderGroupsUI() {
+            const container = document.getElementById('groups-list');
+            container.innerHTML = '';
+
+            teams.forEach((t, idx) => {
+                const isActive = idx === currentTurn;
+                const card = document.createElement('div');
+                card.className = `p-2.5 rounded-xl border transition flex items-center justify-between ${isActive ? 'bg-slate-800 border-indigo-400 active-turn-glow' : 'bg-slate-950/60 border-slate-800'}`;
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-extrabold text-white shrink-0 border border-white/60 shadow" style="background:${t.bg}">
+                            ${t.id + 1}
+                        </div>
+                        <div class="min-w-0">
+                            <input type="text" value="${t.name}" onchange="renameTeam(${t.id}, this.value)"
+                                class="bg-transparent text-xs font-extrabold text-white focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-400 rounded px-1 w-28 truncate" title="Klik untuk ubah nama kelompok">
+                            <div class="text-[10px] text-slate-400 px-1">Petak: <strong class="text-indigo-300">${t.pos}</strong>/100</div>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-xs font-extrabold text-amber-400">${t.score} Poin</div>
+                        ${isActive ? '<span class="text-[9px] font-bold text-emerald-400 uppercase">Giliran</span>' : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            const cur = teams[currentTurn];
+            document.getElementById('turn-group-name').innerText = `${cur.name} (${cur.colorName})`;
+            document.getElementById('turn-badge-dot').style.backgroundColor = cur.bg;
+        }
+
+        function renameTeam(id, newName) {
+            const clean = newName.trim();
+            if (clean) {
+                teams[id].name = clean;
+                renderGroupsUI();
+            }
+        }
+
+        function addActivityLog(htmlMsg) {
+            const log = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = "bg-slate-950/70 border-l-2 border-indigo-500 px-2.5 py-1.5 rounded-r-lg text-slate-300 leading-snug";
+            entry.innerHTML = htmlMsg;
+            log.prepend(entry);
+        }
+
+        // ---------------------------------------------------------------------
+        // 8. 3D DICE ROLLING & STEP-BY-STEP MOVEMENT ENGINE
+        // ---------------------------------------------------------------------
+        const DICE_ROTATIONS = {
+            1: 'rotateX(0deg) rotateY(0deg)',
+            2: 'rotateX(0deg) rotateY(-90deg)',
+            3: 'rotateX(0deg) rotateY(180deg)',
+            4: 'rotateX(0deg) rotateY(90deg)',
+            5: 'rotateX(-90deg) rotateY(0deg)',
+            6: 'rotateX(90deg) rotateY(0deg)'
+        };
+
+        let pendingDiceRoll = 0;
+
+        function handleRollDice() {
+            if (isBusy || gameWon) return;
+            isBusy = true;
+            document.getElementById('btn-roll-dice').disabled = true;
+            document.getElementById('btn-roll-dice').classList.add('opacity-50');
+
+            const cube = document.getElementById('cube-dice');
+            const result = Math.floor(Math.random() * 6) + 1;
+            pendingDiceRoll = result;
+
+            // Spin animation
+            let spins = 0;
+            const spinInterval = setInterval(() => {
+                playSFX('dice');
+                const rx = Math.floor(Math.random() * 4) * 90 + 360;
+                const ry = Math.floor(Math.random() * 4) * 90 + 360;
+                cube.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+                spins++;
+                if (spins >= 5) {
+                    clearInterval(spinInterval);
+                    cube.style.transform = DICE_ROTATIONS[result];
+                    setTimeout(() => onDiceFinished(result), 550);
+                }
+            }, 90);
+        }
+
+        function onDiceFinished(diceValue) {
+            const team = teams[currentTurn];
+            addActivityLog(`🎲 <strong>${team.name}</strong> melempar dadu: <span class="text-amber-400 font-extrabold">${diceValue}</span>.`);
+
+            if (settings.quizMode === 'everystep') {
+                // Must answer a quiz before moving
+                openQuizModal({
+                    type: 'everystep',
+                    diceValue: diceValue,
+                    badgeText: `🎲 Tantangan Langkah (+${diceValue} Petak)`
+                });
+            } else {
+                // Move first, then check special tiles
+                animatePawnSteps(currentTurn, diceValue, () => {
+                    evaluateLandingTile(currentTurn);
+                });
+            }
+        }
+
+        function animatePawnSteps(teamIdx, steps, callback) {
+            const team = teams[teamIdx];
+            let remaining = Math.abs(steps);
+            let direction = steps >= 0 ? 1 : -1;
+
+            if (remaining === 0) {
+                if (callback) callback();
+                return;
+            }
+
+            const stepTimer = setInterval(() => {
+                // Bounce back from 100 if exceeding 100
+                if (direction === 1 && team.pos >= 100) {
+                    direction = -1;
+                }
+                if (direction === -1 && team.pos <= 1) {
+                    direction = 1;
+                }
+
+                team.pos += direction;
+                playSFX('step');
+                renderPawns(true);
+                renderGroupsUI();
+
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(stepTimer);
+                    setTimeout(() => {
+                        if (callback) callback();
+                    }, 300);
+                }
+            }, 240);
+        }
+
+        function evaluateLandingTile(teamIdx) {
+            const team = teams[teamIdx];
+
+            // Check Win at exactly 100
+            if (team.pos === 100) {
+                triggerVictory(team);
+                return;
+            }
+
+            // Check Ladder
+            const ladder = LADDERS.find(l => l.start === team.pos);
+            if (ladder) {
+                openQuizModal({
+                    type: 'ladder',
+                    targetPos: ladder.end,
+                    badgeText: `🪜 Kuis Tangga (Petak ${ladder.start} → ${ladder.end})`
+                });
+                return;
+            }
+
+            // Check Snake
+            const snake = SNAKES.find(s => s.start === team.pos);
+            if (snake) {
+                openQuizModal({
+                    type: 'snake',
+                    targetPos: snake.end,
+                    badgeText: `🐍 Kuis Ular (Petak ${snake.start} → ${snake.end})`
+                });
+                return;
+            }
+
+            // Check Star Tile
+            if (STAR_TILES.includes(team.pos)) {
+                openQuizModal({
+                    type: 'star',
+                    badgeText: `⭐ Petak Bintang Bonus (+2 Langkah)`
+                });
+                return;
+            }
+
+            // Normal tile -> end turn
+            endCurrentTurn();
+        }
+
+        function endCurrentTurn() {
+            currentTurn = (currentTurn + 1) % teams.length;
+            isBusy = false;
+            document.getElementById('btn-roll-dice').disabled = false;
+            document.getElementById('btn-roll-dice').classList.remove('opacity-50');
+            renderGroupsUI();
+            renderPawns(false);
+        }
+
+        // ---------------------------------------------------------------------
+        // 9. QUIZ MODAL LOGIC (NON-REPEATING POOL, TIMER & EXPLANATIONS)
+        // ---------------------------------------------------------------------
+        let currentQuizContext = null;
+        let currentQuestionObj = null;
+        let selectedChoiceIdx = null;
+        let quizTimerHandle = null;
+
+        function getFilteredQuestions() {
+            let pool = questionsBank;
+            if (settings.categoryFilter !== 'ALL') {
+                const catFiltered = pool.filter(q => q.category === settings.categoryFilter);
+                if (catFiltered.length > 0) pool = catFiltered;
+            }
+            if (settings.difficultyFilter !== 'ALL') {
+                const diffFiltered = pool.filter(q => q.difficulty === settings.difficultyFilter);
+                if (diffFiltered.length > 0) pool = diffFiltered;
+            }
+            return pool.length > 0 ? pool : questionsBank;
+        }
+
+        function pickNextQuestion() {
+            const pool = getFilteredQuestions();
+            let unused = pool.filter(q => !usedQuestionIds.has(q.id));
+            if (unused.length === 0) {
+                // Reset cycle once all questions in pool have been used
+                pool.forEach(q => usedQuestionIds.delete(q.id));
+                unused = pool;
+            }
+            const chosen = unused[Math.floor(Math.random() * unused.length)];
+            usedQuestionIds.add(chosen.id);
+            updateQuestionCounters();
+            return chosen;
+        }
+
+        function openQuizModal(context) {
+            currentQuizContext = context;
+            currentQuestionObj = pickNextQuestion();
+            selectedChoiceIdx = null;
+
+            const team = teams[currentTurn];
+            document.getElementById('quiz-context-badge').innerText = context.badgeText;
+            document.getElementById('quiz-diff-badge').innerText = currentQuestionObj.difficulty;
+            const topicLabel = currentQuestionObj.topicGroup ? ` • Topik ${currentQuestionObj.topicGroup}` : '';
+            document.getElementById('quiz-cat-badge').innerText = `${currentQuestionObj.category}${topicLabel}`;
+            document.getElementById('quiz-team-label').innerText = team.name;
+            document.getElementById('quiz-team-label').style.borderColor = team.bg;
+            document.getElementById('quiz-question-text').innerText = currentQuestionObj.question;
+
+            // Rule hint
+            const hintEl = document.getElementById('quiz-rule-hint');
+            if (context.type === 'ladder') hintEl.innerText = "Jawab BENAR untuk naik tangga! Salah = tetap di tempat.";
+            else if (context.type === 'snake') hintEl.innerText = "Jawab BENAR agar selamat dari ular! Salah = turun ke ekor ular.";
+            else if (context.type === 'star') hintEl.innerText = "Jawab BENAR untuk bonus +15 poin & maju +2 petak!";
+            else if (context.type === 'everystep') hintEl.innerText = `Jawab BENAR untuk melangkah maju ${context.diceValue} petak!`;
+
+            // Render options
+            const grid = document.getElementById('quiz-options-grid');
+            grid.innerHTML = '';
+            currentQuestionObj.options.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.id = `quiz-opt-btn-${idx}`;
+                btn.className = "p-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 border-2 border-slate-700 text-left text-white font-semibold text-base transition flex items-center gap-3.5 active:scale-[0.99]";
+                btn.innerHTML = `
+                    <span class="w-8 h-8 rounded-xl bg-slate-700 text-indigo-300 font-extrabold flex items-center justify-center shrink-0">${String.fromCharCode(65 + idx)}</span>
+                    <span>${optText}</span>
+                `;
+                btn.onclick = () => selectQuizChoice(idx);
+                grid.appendChild(btn);
+            });
+
+            // Reset modal state
+            document.getElementById('quiz-explanation-box').classList.add('hidden');
+            const submitBtn = document.getElementById('btn-submit-answer');
+            submitBtn.classList.remove('hidden');
+            submitBtn.disabled = true;
+            document.getElementById('btn-continue-game').classList.add('hidden');
+
+            document.getElementById('quiz-modal').classList.remove('hidden');
+
+            // Timer
+            clearInterval(quizTimerHandle);
+            const timerBox = document.getElementById('quiz-timer-box');
+            if (settings.timerDuration > 0) {
+                timerBox.classList.remove('hidden');
+                let sec = settings.timerDuration;
+                document.getElementById('quiz-timer-text').innerText = `${sec}s`;
+                quizTimerHandle = setInterval(() => {
+                    sec--;
+                    document.getElementById('quiz-timer-text').innerText = `${sec}s`;
+                    if (sec <= 0) {
+                        clearInterval(quizTimerHandle);
+                        evaluateQuizOutcome(false, true);
+                    }
+                }, 1000);
+            } else {
+                timerBox.classList.add('hidden');
+            }
+        }
+
+        function selectQuizChoice(idx) {
+            if (!document.getElementById('btn-continue-game').classList.contains('hidden')) return;
+            selectedChoiceIdx = idx;
+            for (let i = 0; i < 4; i++) {
+                const b = document.getElementById(`quiz-opt-btn-${i}`);
+                if (b) {
+                    b.classList.remove('border-indigo-400', 'bg-indigo-950/80');
+                    b.classList.add('border-slate-700');
+                }
+            }
+            const active = document.getElementById(`quiz-opt-btn-${idx}`);
+            active.classList.remove('border-slate-700');
+            active.classList.add('border-indigo-400', 'bg-indigo-950/80');
+            document.getElementById('btn-submit-answer').disabled = false;
+        }
+
+        function confirmQuizAnswer() {
+            if (selectedChoiceIdx === null) return;
+            clearInterval(quizTimerHandle);
+            const isCorrect = selectedChoiceIdx === currentQuestionObj.answer;
+            evaluateQuizOutcome(isCorrect, false);
+        }
+
+        let lastQuizWasCorrect = false;
+
+        function evaluateQuizOutcome(isCorrect, isTimeout) {
+            lastQuizWasCorrect = isCorrect;
+            const team = teams[currentTurn];
+
+            // Highlight correct & wrong buttons
+            for (let i = 0; i < 4; i++) {
+                const b = document.getElementById(`quiz-opt-btn-${i}`);
+                b.disabled = true;
+                if (i === currentQuestionObj.answer) {
+                    b.classList.remove('border-slate-700', 'border-indigo-400');
+                    b.classList.add('border-emerald-500', 'bg-emerald-950/70');
+                } else if (i === selectedChoiceIdx && !isCorrect) {
+                    b.classList.remove('border-indigo-400');
+                    b.classList.add('border-rose-500', 'bg-rose-950/70');
+                }
+            }
+
+            const expBox = document.getElementById('quiz-explanation-box');
+            const heading = document.getElementById('quiz-result-heading');
+            const expText = document.getElementById('quiz-explanation-text');
+            expBox.classList.remove('hidden', 'bg-emerald-950/60', 'border-emerald-500/50', 'bg-rose-950/60', 'border-rose-500/50');
+
+            if (isCorrect) {
+                playSFX('correct');
+                team.score += 15;
+                expBox.classList.add('bg-emerald-950/60', 'border-emerald-500/50');
+                heading.className = "text-base font-extrabold text-emerald-300 mb-1";
+                heading.innerText = "✅ JAWABAN BENAR! (+15 Poin)";
+            } else {
+                playSFX('wrong');
+                expBox.classList.add('bg-rose-950/60', 'border-rose-500/50');
+                heading.className = "text-base font-extrabold text-rose-300 mb-1";
+                heading.innerText = isTimeout
+                    ? `⏱️ WAKTU HABIS! Jawaban benar: ${String.fromCharCode(65 + currentQuestionObj.answer)}`
+                    : `❌ KURANG TEPAT! Jawaban benar: ${String.fromCharCode(65 + currentQuestionObj.answer)}`;
+            }
+
+            expText.innerText = currentQuestionObj.explanation || "Terus berlatih konsep SPLDV dan Bangun Ruang!";
+            renderGroupsUI();
+
+            document.getElementById('btn-submit-answer').classList.add('hidden');
+            document.getElementById('btn-continue-game').classList.remove('hidden');
+        }
+
+        function finishQuizTurn() {
+            document.getElementById('quiz-modal').classList.add('hidden');
+            const team = teams[currentTurn];
+            const ctx = currentQuizContext;
+
+            if (ctx.type === 'ladder') {
+                if (lastQuizWasCorrect) {
+                    playSFX('ladder');
+                    addActivityLog(`🪜 <strong>${team.name}</strong> menjawab benar dan naik tangga ke petak <strong>${ctx.targetPos}</strong>!`);
+                    team.pos = ctx.targetPos;
+                    renderPawns(true);
+                    renderGroupsUI();
+                    if (team.pos === 100) { triggerVictory(team); return; }
+                } else {
+                    addActivityLog(`🛑 <strong>${team.name}</strong> gagal menjawab soal tangga, tetap di petak ${team.pos}.`);
+                }
+                endCurrentTurn();
+            } else if (ctx.type === 'snake') {
+                if (lastQuizWasCorrect) {
+                    addActivityLog(`🛡️ <strong>${team.name}</strong> menjawab benar dan selamat dari ular di petak ${team.pos}!`);
+                } else {
+                    playSFX('snake');
+                    addActivityLog(`🐍 <strong>${team.name}</strong> salah menjawab dan turun mengikuti ular ke petak <strong>${ctx.targetPos}</strong>!`);
+                    team.pos = ctx.targetPos;
+                    renderPawns(true);
+                    renderGroupsUI();
+                }
+                endCurrentTurn();
+            } else if (ctx.type === 'star') {
+                if (lastQuizWasCorrect) {
+                    addActivityLog(`⭐ <strong>${team.name}</strong> menjawab benar petak bintang! Maju +2 langkah.`);
+                    animatePawnSteps(currentTurn, 2, () => {
+                        if (team.pos === 100) triggerVictory(team);
+                        else endCurrentTurn();
+                    });
+                } else {
+                    addActivityLog(`⭐ <strong>${team.name}</strong> gagal mendapat bonus petak bintang.`);
+                    endCurrentTurn();
+                }
+            } else if (ctx.type === 'everystep') {
+                if (lastQuizWasCorrect) {
+                    addActivityLog(`✅ <strong>${team.name}</strong> menjawab benar dan melangkah maju ${ctx.diceValue} petak.`);
+                    animatePawnSteps(currentTurn, ctx.diceValue, () => {
+                        evaluateLandingTileAfterEveryStep(currentTurn);
+                    });
+                } else {
+                    addActivityLog(`❌ <strong>${team.name}</strong> salah menjawab sehingga batal melangkah.`);
+                    endCurrentTurn();
+                }
+            }
+        }
+
+        function evaluateLandingTileAfterEveryStep(teamIdx) {
+            const team = teams[teamIdx];
+            if (team.pos === 100) { triggerVictory(team); return; }
+            const ladder = LADDERS.find(l => l.start === team.pos);
+            if (ladder) {
+                playSFX('ladder');
+                team.pos = ladder.end;
+                addActivityLog(`🪜 <strong>${team.name}</strong> naik tangga ke petak <strong>${ladder.end}</strong>!`);
+                renderPawns(true);
+                renderGroupsUI();
+                if (team.pos === 100) { triggerVictory(team); return; }
+            }
+            const snake = SNAKES.find(s => s.start === team.pos);
+            if (snake) {
+                playSFX('snake');
+                team.pos = snake.end;
+                addActivityLog(`🐍 <strong>${team.name}</strong> turun ular ke petak <strong>${snake.end}</strong>!`);
+                renderPawns(true);
+                renderGroupsUI();
+            }
+            endCurrentTurn();
+        }
+
+        // ---------------------------------------------------------------------
+        // 10. VICTORY CELEBRATION & RESET
+        // ---------------------------------------------------------------------
+        function triggerVictory(winnerTeam) {
+            gameWon = true;
+            isBusy = false;
+            playSFX('win');
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 } });
+            }
+
+            document.getElementById('winner-title').innerText = `🏆 ${winnerTeam.name} Menang!`;
+            document.getElementById('winner-subtitle').innerText = `Berhasil menaklukkan petak 100 dengan perolehan ${winnerTeam.score} Poin!`;
+
+            const sorted = [...teams].sort((a, b) => (b.pos * 1000 + b.score) - (a.pos * 1000 + a.score));
+            const standingsEl = document.getElementById('winner-standings');
+            standingsEl.innerHTML = sorted.map((t, idx) => `
+                <div class="flex items-center justify-between py-1.5 border-b border-slate-800 last:border-none">
+                    <span class="font-bold text-white">#${idx + 1} ${t.name} (${t.colorName})</span>
+                    <span class="text-slate-300">Petak <strong>${t.pos}</strong> • <strong class="text-amber-400">${t.score} Poin</strong></span>
+                </div>
+            `).join('');
+
+            document.getElementById('winner-modal').classList.remove('hidden');
+        }
+
+        function confirmResetGame() {
+            showConfirmBox("Reset Permainan?", "Semua pion akan kembali ke Petak 1 dan skor direset menjadi 0.", executeResetGame);
+        }
+
+        function executeResetGame() {
+            closeConfirmModal();
+            document.getElementById('winner-modal').classList.add('hidden');
+            teams.forEach(t => { t.pos = 1; t.score = 0; });
+            currentTurn = 0;
+            isBusy = false;
+            gameWon = false;
+            usedQuestionIds.clear();
+            document.getElementById('btn-roll-dice').disabled = false;
+            document.getElementById('btn-roll-dice').classList.remove('opacity-50');
+            document.getElementById('activity-log').innerHTML = '';
+            addActivityLog("🔄 Permainan baru dimulai! Giliran <strong>Kelompok 1</strong>.");
+            renderGroupsUI();
+            renderPawns(false);
+            updateQuestionCounters();
+        }
+
+        // ---------------------------------------------------------------------
+        // 11. BANK SOAL MANAGER, CRUD, JSON IMPORT/EXPORT & 1-CLICK GENERATOR
+        // ---------------------------------------------------------------------
+        let mgrCurrentFilter = 'ALL';
+
+        function openQuestionManager() {
+            renderManagerQuestions();
+            document.getElementById('question-manager-modal').classList.remove('hidden');
+        }
+
+        function closeQuestionManager() {
+            document.getElementById('question-manager-modal').classList.add('hidden');
+            document.getElementById('generator-dropdown').classList.add('hidden');
+        }
+
+        function setManagerFilter(filter) {
+            mgrCurrentFilter = filter;
+            ['ALL', 'Mudah', 'Sedang', 'Sulit'].forEach(f => {
+                const btn = document.getElementById(`mgr-filter-${f}`);
+                if (btn) {
+                    btn.className = (f === filter)
+                        ? "px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white"
+                        : "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700";
+                }
+            });
+            renderManagerQuestions();
+        }
+
+        function renderManagerQuestions() {
+            document.getElementById('mgr-count-all').innerText = questionsBank.length;
+            document.getElementById('mgr-count-mudah').innerText = questionsBank.filter(q => q.difficulty === 'Mudah').length;
+            document.getElementById('mgr-count-sedang').innerText = questionsBank.filter(q => q.difficulty === 'Sedang').length;
+            document.getElementById('mgr-count-sulit').innerText = questionsBank.filter(q => q.difficulty === 'Sulit').length;
+
+            const container = document.getElementById('mgr-questions-list');
+            container.innerHTML = '';
+
+            const searchTerm = (document.getElementById('mgr-search-input')?.value || '').toLowerCase().trim();
+            const catFilter = document.getElementById('mgr-category-filter')?.value || 'ALL';
+            const topicFilter = document.getElementById('mgr-topic-filter')?.value || 'ALL';
+
+            const list = questionsBank.filter(q => {
+                if (mgrCurrentFilter !== 'ALL' && q.difficulty !== mgrCurrentFilter) return false;
+                if (catFilter !== 'ALL' && q.category !== catFilter) return false;
+                if (topicFilter !== 'ALL' && String(q.topicGroup) !== topicFilter) return false;
+                if (searchTerm) {
+                    const inQ = q.question.toLowerCase().includes(searchTerm);
+                    const inExp = (q.explanation || '').toLowerCase().includes(searchTerm);
+                    const inOpts = q.options.some(o => o.toLowerCase().includes(searchTerm));
+                    if (!inQ && !inExp && !inOpts) return false;
+                }
+                return true;
+            });
+
+            if (list.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-400 text-sm">Tidak ada soal yang cocok dengan filter pencarian.</div>`;
+                return;
+            }
+
+            list.forEach((q, idx) => {
+                const diffBadge = q.difficulty === 'Mudah'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    : q.difficulty === 'Sedang'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+
+                const topicText = q.topicGroup && TOPIC_LABELS[q.topicGroup] ? TOPIC_LABELS[q.topicGroup] : `Topik ${q.topicGroup || '-'}`;
+
+                const card = document.createElement('div');
+                card.className = "bg-slate-800/75 border border-slate-700/80 rounded-2xl p-4 flex flex-col gap-2";
+                card.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-xs font-extrabold text-slate-400">#${idx + 1}</span>
+                            <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${q.category}</span>
+                            <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${diffBadge}">${q.difficulty}</span>
+                            <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-700">${topicText}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="openQuestionFormModal(${q.id})" class="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-indigo-300 text-xs font-bold transition">
+                                <i class="fa-solid fa-pen"></i> Edit
+                            </button>
+                            <button onclick="deleteQuestionItem(${q.id})" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold transition">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-sm font-bold text-white">${q.question}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs">
+                        ${q.options.map((opt, i) => `
+                            <div class="px-3 py-1.5 rounded-lg border ${i === q.answer ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 font-bold' : 'bg-slate-900/70 border-slate-800 text-slate-300'}">
+                                ${String.fromCharCode(65 + i)}. ${opt}
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${q.explanation ? `<div class="text-[11px] text-slate-400 italic pt-1">💡 Pembahasan: ${q.explanation}</div>` : ''}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openQuestionFormModal(editId = null) {
+            const titleEl = document.getElementById('q-form-title');
+            if (editId !== null) {
+                const q = questionsBank.find(item => item.id === editId);
+                if (!q) return;
+                titleEl.innerHTML = `<i class="fa-solid fa-pen text-indigo-400"></i> <span>Edit Soal</span>`;
+                document.getElementById('edit-q-id').value = q.id;
+                document.getElementById('form-q-category').value = q.category;
+                document.getElementById('form-q-difficulty').value = q.difficulty;
+                document.getElementById('form-q-topic').value = q.topicGroup || 1;
+                document.getElementById('form-q-text').value = q.question;
+                document.getElementById('form-q-opt0').value = q.options[0];
+                document.getElementById('form-q-opt1').value = q.options[1];
+                document.getElementById('form-q-opt2').value = q.options[2];
+                document.getElementById('form-q-opt3').value = q.options[3];
+                document.getElementById('form-q-answer').value = q.answer;
+                document.getElementById('form-q-explanation').value = q.explanation || '';
+            } else {
+                titleEl.innerHTML = `<i class="fa-solid fa-plus text-emerald-400"></i> <span>Tambah Soal Baru</span>`;
+                document.getElementById('edit-q-id').value = '';
+                document.getElementById('form-q-topic').value = '1';
+                document.getElementById('form-q-text').value = '';
+                document.getElementById('form-q-opt0').value = '';
+                document.getElementById('form-q-opt1').value = '';
+                document.getElementById('form-q-opt2').value = '';
+                document.getElementById('form-q-opt3').value = '';
+                document.getElementById('form-q-answer').value = '0';
+                document.getElementById('form-q-explanation').value = '';
+            }
+            document.getElementById('question-form-modal').classList.remove('hidden');
+        }
+
+        function closeQuestionFormModal() {
+            document.getElementById('question-form-modal').classList.add('hidden');
+        }
+
+        function saveQuestionForm(e) {
+            e.preventDefault();
+            const editIdStr = document.getElementById('edit-q-id').value;
+            const payload = {
+                id: editIdStr ? parseInt(editIdStr) : Date.now(),
+                topicGroup: parseInt(document.getElementById('form-q-topic').value) || 1,
+                category: document.getElementById('form-q-category').value,
+                difficulty: document.getElementById('form-q-difficulty').value,
+                question: document.getElementById('form-q-text').value.trim(),
+                options: [
+                    document.getElementById('form-q-opt0').value.trim(),
+                    document.getElementById('form-q-opt1').value.trim(),
+                    document.getElementById('form-q-opt2').value.trim(),
+                    document.getElementById('form-q-opt3').value.trim()
+                ],
+                answer: parseInt(document.getElementById('form-q-answer').value),
+                explanation: document.getElementById('form-q-explanation').value.trim()
+            };
+
+            if (editIdStr) {
+                const idx = questionsBank.findIndex(q => q.id === payload.id);
+                if (idx !== -1) questionsBank[idx] = payload;
+            } else {
+                questionsBank.unshift(payload);
+            }
+
+            saveQuestionsToStorage();
+            closeQuestionFormModal();
+            renderManagerQuestions();
+        }
+
+        function deleteQuestionItem(id) {
+            if (questionsBank.length <= 1) return;
+            questionsBank = questionsBank.filter(q => q.id !== id);
+            saveQuestionsToStorage();
+            renderManagerQuestions();
+        }
+
+        function restoreDefaultQuestions() {
+            showConfirmBox("Pulihkan 80 Soal Standar?", "Bank soal akan dikembalikan ke 80 soal lengkap (20 topik × 4 variasi) SPLDV & Bangun Ruang.", () => {
+                closeConfirmModal();
+                questionsBank = JSON.parse(JSON.stringify(DEFAULT_QUESTIONS));
+                usedQuestionIds.clear();
+                saveQuestionsToStorage();
+                renderManagerQuestions();
+            });
+        }
+
+        function exportQuestionsJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(questionsBank, null, 2));
+            const a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", "bank_80_soal_spldv_bangun_ruang.json");
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function exportQuestionsCSV() {
+            const headers = ["Topik", "Kategori", "Kesulitan", "Pertanyaan", "Opsi_A", "Opsi_B", "Opsi_C", "Opsi_D", "Kunci", "Pembahasan"];
+            const letters = ["A", "B", "C", "D"];
+            const rows = questionsBank.map(q => [
+                q.topicGroup || 1,
+                q.category,
+                q.difficulty,
+                `"${(q.question || '').replace(/"/g, '""')}"`,
+                `"${(q.options[0] || '').replace(/"/g, '""')}"`,
+                `"${(q.options[1] || '').replace(/"/g, '""')}"`,
+                `"${(q.options[2] || '').replace(/"/g, '""')}"`,
+                `"${(q.options[3] || '').replace(/"/g, '""')}"`,
+                letters[q.answer] || "A",
+                `"${(q.explanation || '').replace(/"/g, '""')}"`
+            ].join(","));
+            const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent([headers.join(","), ...rows].join("\n"));
+            const a = document.createElement('a');
+            a.setAttribute("href", csvContent);
+            a.setAttribute("download", "bank_80_soal_spldv_bangun_ruang.csv");
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (ch === '"' && line[i + 1] === '"') {
+                    cur += '"';
+                    i++;
+                } else if (ch === '"') {
+                    inQuotes = !inQuotes;
+                } else if (ch === ',' && !inQuotes) {
+                    result.push(cur);
+                    cur = '';
+                } else {
+                    cur += ch;
+                }
+            }
+            result.push(cur);
+            return result;
+        }
+
+        function importQuestionsFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    if (file.name.toLowerCase().endsWith('.csv')) {
+                        const lines = text.split(/\r?\n/).filter(l => l.trim());
+                        const parsedList = [];
+                        for (let i = 1; i < lines.length; i++) {
+                            const cols = parseCSVLine(lines[i]);
+                            if (cols.length >= 9) {
+                                const ansMap = { A: 0, B: 1, C: 2, D: 3 };
+                                const ansKey = (cols[8] || 'A').trim().toUpperCase();
+                                parsedList.push({
+                                    id: Date.now() + i,
+                                    topicGroup: parseInt(cols[0]) || 1,
+                                    category: cols[1].trim() || "SPLDV",
+                                    difficulty: cols[2].trim() || "Sedang",
+                                    question: cols[3].trim(),
+                                    options: [cols[4].trim(), cols[5].trim(), cols[6].trim(), cols[7].trim()],
+                                    answer: ansMap[ansKey] !== undefined ? ansMap[ansKey] : 0,
+                                    explanation: (cols[9] || '').trim()
+                                });
+                            }
+                        }
+                        if (parsedList.length > 0) {
+                            questionsBank = parsedList;
+                            usedQuestionIds.clear();
+                            saveQuestionsToStorage();
+                            renderManagerQuestions();
+                            addActivityLog(`📥 Berhasil mengimpor <strong>${parsedList.length}</strong> soal dari CSV.`);
+                        }
+                    } else {
+                        const imported = JSON.parse(text);
+                        if (Array.isArray(imported) && imported.length > 0 && imported[0].question && Array.isArray(imported[0].options)) {
+                            questionsBank = imported;
+                            usedQuestionIds.clear();
+                            saveQuestionsToStorage();
+                            renderManagerQuestions();
+                            addActivityLog(`📥 Berhasil mengimpor <strong>${imported.length}</strong> soal dari JSON.`);
+                        }
+                    }
+                } catch (err) {}
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // 1-CLICK AUTOMATIC QUESTION GENERATOR (MUDAH / SEDANG / SULIT)
+        function toggleGeneratorDropdown() {
+            document.getElementById('generator-dropdown').classList.toggle('hidden');
+        }
+
+        function generateAutoQuestion(level) {
+            document.getElementById('generator-dropdown').classList.add('hidden');
+            const isSPLDV = Math.random() > 0.5;
+            let newQ = null;
+
+            if (level === 'Mudah') {
+                if (isSPLDV) {
+                    const a = Math.floor(Math.random() * 5) + 2;
+                    const b = Math.floor(Math.random() * 5) + 2;
+                    const total = (a * 3 + b * 2) * 1000;
+                    newQ = {
+                        id: Date.now(), category: "SPLDV", difficulty: "Mudah",
+                        question: `Harga ${a} pulpen dan ${b} spidol adalah Rp${total.toLocaleString('id-ID')},00. Jika x = harga pulpen dan y = harga spidol, model matematikanya adalah ...`,
+                        options: [
+                            `${b}x + ${a}y = ${total.toLocaleString('id-ID')}`,
+                            `${a}x + ${b}y = ${total.toLocaleString('id-ID')}`,
+                            `${a}x - ${b}y = ${total.toLocaleString('id-ID')}`,
+                            `x + y = ${total.toLocaleString('id-ID')}`
+                        ],
+                        answer: 1,
+                        explanation: `${a} pulpen (x) dan ${b} spidol (y) berjumlah Rp${total.toLocaleString('id-ID')} ditulis ${a}x + ${b}y = ${total.toLocaleString('id-ID')}.`
+                    };
+                } else {
+                    const r = Math.floor(Math.random() * 6) + 3;
+                    const vol = r * r * r;
+                    newQ = {
+                        id: Date.now(), category: "Bangun Ruang", difficulty: "Mudah",
+                        question: `Volume sebuah kubus yang memiliki panjang rusuk ${r} cm adalah ...`,
+                        options: [`${r * r} cm³`, `${6 * r * r} cm³`, `${vol} cm³`, `${vol + 20} cm³`],
+                        answer: 2,
+                        explanation: `Volume kubus = s³ = ${r}³ = ${vol} cm³.`
+                    };
+                }
+            } else if (level === 'Sedang') {
+                if (isSPLDV) {
+                    const xVal = Math.floor(Math.random() * 6) + 2;
+                    const yVal = Math.floor(Math.random() * 6) + 2;
+                    const sum = xVal + yVal;
+                    const diff = xVal - yVal;
+                    newQ = {
+                        id: Date.now(), category: "SPLDV", difficulty: "Sedang",
+                        question: `Diketahui sistem persamaan x + y = ${sum} dan x - y = ${diff}. Nilai dari x adalah ...`,
+                        options: [`${xVal - 1}`, `${xVal}`, `${yVal}`, `${xVal + 2}`],
+                        answer: 1,
+                        explanation: `Jumlahkan kedua persamaan: 2x = ${sum + diff} → x = ${xVal}.`
+                    };
+                } else {
+                    const s = Math.floor(Math.random() * 6) + 4;
+                    const lp = 6 * s * s;
+                    newQ = {
+                        id: Date.now(), category: "Bangun Ruang", difficulty: "Sedang",
+                        question: `Luas permukaan sebuah kubus dengan panjang rusuk ${s} cm adalah ...`,
+                        options: [`${s * s} cm²`, `${4 * s * s} cm²`, `${lp} cm²`, `${s * s * s} cm²`],
+                        answer: 2,
+                        explanation: `Luas permukaan kubus = 6 × s² = 6 × ${s}² = ${lp} cm².`
+                    };
+                }
+            } else {
+                if (isSPLDV) {
+                    const buku = (Math.floor(Math.random() * 4) + 2) * 1000;
+                    const pensil = (Math.floor(Math.random() * 3) + 1) * 1000;
+                    const t1 = 2 * buku + pensil;
+                    const t2 = buku + pensil;
+                    newQ = {
+                        id: Date.now(), category: "SPLDV", difficulty: "Sulit",
+                        question: `Harga 2 buku dan 1 pensil adalah Rp${t1.toLocaleString('id-ID')},00, sedangkan harga 1 buku dan 1 pensil adalah Rp${t2.toLocaleString('id-ID')},00. Harga 1 buku adalah ...`,
+                        options: [
+                            `Rp${(buku - 1000).toLocaleString('id-ID')},00`,
+                            `Rp${buku.toLocaleString('id-ID')},00`,
+                            `Rp${(buku + 1000).toLocaleString('id-ID')},00`,
+                            `Rp${pensil.toLocaleString('id-ID')},00`
+                        ],
+                        answer: 1,
+                        explanation: `(2b + p) - (b + p) = ${t1.toLocaleString('id-ID')} - ${t2.toLocaleString('id-ID')} → b = Rp${buku.toLocaleString('id-ID')},00.`
+                    };
+                } else {
+                    const r = 7;
+                    const t = (Math.floor(Math.random() * 5) + 5) * 2;
+                    const vol = (22 / 7) * r * r * t;
+                    newQ = {
+                        id: Date.now(), category: "Bangun Ruang", difficulty: "Sulit",
+                        question: `Volume sebuah tabung dengan jari-jari alas ${r} cm dan tinggi ${t} cm (π = 22/7) adalah ...`,
+                        options: [`${vol / 2} cm³`, `${vol} cm³`, `${vol + 154} cm³`, `${vol * 2} cm³`],
+                        answer: 1,
+                        explanation: `V = π × r² × t = (22/7) × 7² × ${t} = 154 × ${t} = ${vol} cm³.`
+                    };
+                }
+            }
+
+            questionsBank.unshift(newQ);
+            saveQuestionsToStorage();
+            renderManagerQuestions();
+        }
+
+        // ---------------------------------------------------------------------
+        // 12. SETTINGS & CUSTOM CONFIRMATION MODAL
+        // ---------------------------------------------------------------------
+        function openSettingsModal() {
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function updateSettings() {
+            settings.quizMode = document.getElementById('setting-quiz-mode').value;
+            settings.timerDuration = parseInt(document.getElementById('setting-timer-duration').value);
+            settings.difficultyFilter = document.getElementById('setting-difficulty').value;
+            settings.categoryFilter = document.getElementById('setting-category').value;
+
+            document.getElementById('quick-difficulty-select').value = settings.difficultyFilter;
+            document.getElementById('quick-category-select').value = settings.categoryFilter;
+            document.getElementById('active-mode-badge').innerText = settings.quizMode === 'classic' ? 'Mode Klasik' : 'Mode Setiap Langkah';
+            updateQuestionCounters();
+        }
+
+        function changeDifficultyFilter(val) {
+            settings.difficultyFilter = val;
+            document.getElementById('setting-difficulty').value = val;
+            updateQuestionCounters();
+        }
+
+        function changeCategoryFilter(val) {
+            settings.categoryFilter = val;
+            document.getElementById('setting-category').value = val;
+            updateQuestionCounters();
+        }
+
+        function showConfirmBox(title, message, onYesCallback) {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = message;
+            const yesBtn = document.getElementById('confirm-yes-btn');
+            yesBtn.onclick = onYesCallback;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        }
+
+        // ---------------------------------------------------------------------
+        // 13. INITIALIZATION ON WINDOW LOAD
+        // ---------------------------------------------------------------------
+        window.onload = function() {
+            loadQuestionsFromStorage();
+            renderBoardGrid();
+            renderGroupsUI();
+            updateQuestionCounters();
+            addActivityLog("🎮 Selamat datang di <strong>Ular Tangga Matematika PID</strong>! Giliran <strong>Kelompok 1</strong>.");
+        };
+    </script>
+</body>
+</html>
